@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Kalshi Trading Bot — Dashboard</title>
+<title>Kalshi Trading Bot - Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   :root{
@@ -13,13 +13,35 @@
     --font:'Courier New',Courier,monospace;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:13px;height:100vh;overflow:hidden}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:13px;overflow:hidden}
+
   header{
     display:flex;align-items:center;justify-content:space-between;
     background:var(--bg2);border-bottom:1px solid var(--border);
     padding:0 16px;height:44px;
   }
   .logo{font-size:15px;font-weight:700;color:var(--cyan);letter-spacing:1px}
+  .header-right{display:flex;align-items:center;gap:12px}
+
+  .tabs{display:flex;gap:2px;margin:0 auto}
+  .tab-btn{
+    padding:8px 16px;border:none;background:transparent;color:var(--muted);
+    cursor:pointer;font-family:var(--font);font-size:12px;font-weight:700;
+    letter-spacing:1px;border-bottom:2px solid transparent;transition:all 0.2s;
+  }
+  .tab-btn.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+  .tab-btn:hover{color:var(--text)}
+
+  .btn{
+    padding:6px 12px;border-radius:4px;border:1px solid var(--border);
+    background:var(--bg3);color:var(--text);cursor:pointer;
+    font-family:var(--font);font-size:11px;font-weight:700;
+    transition:all 0.2s;
+  }
+  .btn:hover{background:var(--border);color:var(--cyan)}
+  .btn-stop{border-color:var(--red);color:var(--red)}
+  .btn-stop:hover{background:var(--red);color:var(--bg)}
+
   .mode-badge{
     padding:2px 10px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1px;
   }
@@ -31,13 +53,20 @@
   .status-dot.err{background:var(--red)}
   #ts{color:var(--muted);font-size:11px}
 
+  .tab-content{display:none;width:100%;height:calc(100vh - 44px)}
+  .tab-content.active{display:flex}
+
   .grid{
     display:grid;
     grid-template-columns:270px 1fr 300px;
     grid-template-rows:auto auto 1fr;
     gap:8px;padding:8px;
-    height:calc(100vh - 44px);
+    width:100%;height:100%;
     overflow:hidden;
+  }
+
+  .settings-content{
+    flex:1;overflow:auto;padding:20px;display:flex;flex-direction:column;
   }
 
   .card{
@@ -141,6 +170,27 @@
   .log-CRITICAL{color:var(--red);font-weight:700}
   .log-DEBUG{color:#475569}
 
+  /* SETTINGS FORM */
+  .settings-form{
+    background:var(--bg2);border:1px solid var(--border);border-radius:6px;
+    padding:20px;max-width:600px;width:100%;
+  }
+  .form-group{margin-bottom:16px}
+  .form-label{
+    display:block;color:var(--muted);font-size:11px;text-transform:uppercase;
+    letter-spacing:1px;margin-bottom:6px;font-weight:700;
+  }
+  .form-input{
+    width:100%;padding:8px;background:var(--bg);border:1px solid var(--border);
+    border-radius:4px;color:var(--text);font-family:var(--font);font-size:12px;
+  }
+  .form-input:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 8px rgba(6,182,212,0.2)}
+  .form-help{color:var(--muted);font-size:10px;margin-top:4px;line-height:1.4}
+  .form-actions{display:flex;gap:10px;margin-top:20px}
+  .msg{padding:10px;border-radius:4px;margin-top:10px;font-size:11px;display:none}
+  .msg.success{background:#0d2010;color:var(--green);border:1px solid var(--green)}
+  .msg.error{background:#2a0d0d;color:var(--red);border:1px solid var(--red)}
+
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
   ::-webkit-scrollbar{width:4px;height:4px}
   ::-webkit-scrollbar-track{background:var(--bg)}
@@ -155,101 +205,191 @@
 <body>
 
 <header>
-  <div class="logo">⚡ KALSHI TRADING BOT</div>
-  <div style="display:flex;align-items:center;gap:12px">
-    <span><span class="status-dot" id="conn-dot"></span><span id="conn-status">Connecting…</span></span>
+  <div class="logo">KALSHI TRADING BOT</div>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('dashboard')">Dashboard</button>
+    <button class="tab-btn" onclick="switchTab('settings')">Settings</button>
+  </div>
+  <div class="header-right">
+    <span><span class="status-dot" id="conn-dot"></span><span id="conn-status">Connecting...</span></span>
     <span id="mode-badge" class="mode-badge mode-paper">PAPER</span>
+    <button class="btn btn-stop" onclick="stopBot()">Stop Bot</button>
     <span id="ts"></span>
   </div>
 </header>
 
-<div class="grid">
+<!-- DASHBOARD TAB -->
+<div id="dashboard" class="tab-content active">
+  <div class="grid">
 
-  <!-- PORTFOLIO -->
-  <div class="card" id="portfolio-card">
-    <div class="card-title">💰 Portfolio</div>
-    <div class="card-body">
-      <div class="stat"><span class="stat-label">Value</span><span class="stat-val neu" id="pf-val">—</span></div>
-      <div class="stat"><span class="stat-label">Daily PnL</span><span class="stat-val" id="pf-pnl">—</span></div>
-      <div class="stat"><span class="stat-label">Daily PnL %</span><span class="stat-val" id="pf-pnl-pct">—</span></div>
-      <div class="stat"><span class="stat-label">Win Rate</span><span class="stat-val" id="pf-wr">—</span></div>
-      <div class="stat"><span class="stat-label">Trades</span><span class="stat-val neu" id="pf-trades">—</span></div>
-      <div class="stat"><span class="stat-label">Stop Loss</span><span class="stat-val" id="pf-stop">5.0%</span></div>
-      <div class="stat"><span class="stat-label">Max Position</span><span class="stat-val neu">10.0%</span></div>
-      <div style="margin-top:10px" class="mini-bar" id="circuit-bar"></div>
-    </div>
-  </div>
-
-  <!-- CAPTAIN -->
-  <div class="card" id="captain-card">
-    <div class="card-title">🧠 Captain (Gemini)</div>
-    <div class="card-body">
-      <div id="halt-banner" class="halt-banner" style="display:none">⛔ TRADING HALTED</div>
-      <div class="regime" id="cap-regime">—</div>
-      <div class="mini-bar" style="justify-content:space-between">
-        <div class="mini-stat"><span class="mini-label">Kelly Mult</span><span class="mini-val" id="cap-kelly">—</span></div>
-        <div class="mini-stat"><span class="mini-label">Min Edge</span><span class="mini-val" id="cap-edge">—</span></div>
-        <div class="mini-stat"><span class="mini-label">Source</span><span class="mini-val" id="cap-src" style="font-size:10px">—</span></div>
+    <!-- PORTFOLIO -->
+    <div class="card" id="portfolio-card">
+      <div class="card-title">Portfolio</div>
+      <div class="card-body">
+        <div class="stat"><span class="stat-label">Value</span><span class="stat-val neu" id="pf-val">-</span></div>
+        <div class="stat"><span class="stat-label">Daily PnL</span><span class="stat-val" id="pf-pnl">-</span></div>
+        <div class="stat"><span class="stat-label">Daily PnL %</span><span class="stat-val" id="pf-pnl-pct">-</span></div>
+        <div class="stat"><span class="stat-label">Win Rate</span><span class="stat-val" id="pf-wr">-</span></div>
+        <div class="stat"><span class="stat-label">Trades</span><span class="stat-val neu" id="pf-trades">-</span></div>
+        <div class="stat"><span class="stat-label">Stop Loss</span><span class="stat-val" id="pf-stop">5.0%</span></div>
+        <div class="stat"><span class="stat-label">Max Position</span><span class="stat-val neu">10.0%</span></div>
+        <div style="margin-top:10px" class="mini-bar" id="circuit-bar"></div>
       </div>
-      <div class="reasoning" id="cap-reason">Waiting for Captain review…</div>
+    </div>
+
+    <!-- CAPTAIN -->
+    <div class="card" id="captain-card">
+      <div class="card-title">Captain (Gemini)</div>
+      <div class="card-body">
+        <div id="halt-banner" class="halt-banner" style="display:none">HALTED</div>
+        <div class="regime" id="cap-regime">-</div>
+        <div class="mini-bar" style="justify-content:space-between">
+          <div class="mini-stat"><span class="mini-label">Kelly Mult</span><span class="mini-val" id="cap-kelly">-</span></div>
+          <div class="mini-stat"><span class="mini-label">Min Edge</span><span class="mini-val" id="cap-edge">-</span></div>
+          <div class="mini-stat"><span class="mini-label">Source</span><span class="mini-val" id="cap-src" style="font-size:10px">-</span></div>
+        </div>
+        <div class="reasoning" id="cap-reason">Waiting for Captain review...</div>
+      </div>
+    </div>
+
+    <!-- PRICE CHART -->
+    <div class="card" id="chart-card">
+      <div class="card-title">Spot Price  <span id="chart-label" style="color:var(--cyan)">BTC-USD</span></div>
+      <div class="card-body"><canvas id="priceChart"></canvas></div>
+      <div class="chart-controls">
+        <button class="series-btn active" onclick="setChartSeries('KXBTC15M',this)">BTC</button>
+        <button class="series-btn" onclick="setChartSeries('KXETH15M',this)">ETH</button>
+        <span style="margin-left:auto;color:var(--muted);font-size:11px" id="chart-forecast-label"></span>
+      </div>
+    </div>
+
+    <!-- LIVE TICKER -->
+    <div class="card" id="ticker-card">
+      <div class="card-title">Live Spot</div>
+      <div class="card-body" id="ticker-body"><div class="empty">Waiting for feed...</div></div>
+    </div>
+
+    <!-- FORECAST -->
+    <div class="card" id="forecast-card">
+      <div class="card-title">Forecast (8-min)</div>
+      <div class="card-body" id="forecast-body"><div class="empty">Waiting for TimesFM...</div></div>
+    </div>
+
+    <!-- POSITIONS -->
+    <div class="card" id="positions-card">
+      <div class="card-title">Open Positions <span id="pos-count" style="color:var(--cyan)"></span></div>
+      <div class="card-body" id="positions-body"><div class="empty">No open positions</div></div>
+    </div>
+
+    <!-- DECISIONS TABLE -->
+    <div class="card" id="decisions-card">
+      <div class="card-title">Recent Trade Decisions</div>
+      <div class="card-body" style="padding:0;overflow:auto">
+        <table>
+          <thead>
+            <tr><th>Ticker</th><th>Side</th><th>Px</th><th>Contracts</th><th>Edge</th><th>MTE</th><th>Result</th></tr>
+          </thead>
+          <tbody id="decisions-body">
+            <tr><td colspan="7" class="empty">No decisions yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="card" id="logs-card">
+      <div class="card-title">Live Log  <span style="color:var(--muted);font-weight:400;font-size:10px;cursor:pointer" onclick="toggleAutoScroll()">autoscroll: <span id="as-label">ON</span></span></div>
+      <div class="card-body" style="padding:0;height:calc(100% - 30px)">
+        <div id="log-container"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- SETTINGS TAB -->
+<div id="settings" class="tab-content">
+  <div class="settings-content">
+    <div class="settings-form">
+      <h2 style="color:var(--cyan);margin-bottom:20px;font-size:16px">Configuration</h2>
+
+      <div class="form-group">
+        <label class="form-label">Kalshi API Key ID</label>
+        <input type="text" id="kalshi-key-input" class="form-input" placeholder="Enter your API Key ID from Kalshi dashboard">
+        <div class="form-help">Find this at Kalshi.com > Account > API Keys. It looks like a UUID: 82c55031-c47c-472e-9715-5b6c4edac900</div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn" onclick="saveKalshiKey()">Save Key</button>
+      </div>
+
+      <div id="msg" class="msg"></div>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:30px 0">
+
+      <h3 style="color:var(--cyan);margin-bottom:12px;font-size:14px">About this system</h3>
+      <div style="color:var(--muted);font-size:11px;line-height:1.6">
+        <p>Kalshi Trading Bot - a production-grade automated trading system for Kalshi's 15-minute crypto markets.</p>
+        <p style="margin-top:10px">The system runs in PAPER mode by default (no real money). To trade live:</p>
+        <ul style="margin:8px 0 0 20px">
+          <li>Enter your Kalshi API Key above and save it</li>
+          <li>Verify the bot works in paper mode for 15-30 minutes</li>
+          <li>Edit .env and change TRADING_MODE from "paper" to "live"</li>
+          <li>Restart the bot</li>
+        </ul>
+      </div>
     </div>
   </div>
-
-  <!-- PRICE CHART -->
-  <div class="card" id="chart-card">
-    <div class="card-title">📈 Spot Price  <span id="chart-label" style="color:var(--cyan)">BTC-USD</span></div>
-    <div class="card-body"><canvas id="priceChart"></canvas></div>
-    <div class="chart-controls">
-      <button class="series-btn active" onclick="setChartSeries('KXBTC15M',this)">BTC</button>
-      <button class="series-btn" onclick="setChartSeries('KXETH15M',this)">ETH</button>
-      <span style="margin-left:auto;color:var(--muted);font-size:11px" id="chart-forecast-label"></span>
-    </div>
-  </div>
-
-  <!-- LIVE TICKER -->
-  <div class="card" id="ticker-card">
-    <div class="card-title">🔴 Live Spot</div>
-    <div class="card-body" id="ticker-body"><div class="empty">Waiting for feed…</div></div>
-  </div>
-
-  <!-- FORECAST -->
-  <div class="card" id="forecast-card">
-    <div class="card-title">🔮 Forecast (8-min)</div>
-    <div class="card-body" id="forecast-body"><div class="empty">Waiting for TimesFM…</div></div>
-  </div>
-
-  <!-- POSITIONS -->
-  <div class="card" id="positions-card">
-    <div class="card-title">📊 Open Positions <span id="pos-count" style="color:var(--cyan)"></span></div>
-    <div class="card-body" id="positions-body"><div class="empty">No open positions</div></div>
-  </div>
-
-  <!-- DECISIONS TABLE -->
-  <div class="card" id="decisions-card">
-    <div class="card-title">⚡ Recent Trade Decisions</div>
-    <div class="card-body" style="padding:0;overflow:auto">
-      <table>
-        <thead>
-          <tr><th>Ticker</th><th>Side</th><th>Px</th><th>Contracts</th><th>Edge</th><th>MTE</th><th>Result</th></tr>
-        </thead>
-        <tbody id="decisions-body">
-          <tr><td colspan="7" class="empty">No decisions yet</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- LOGS -->
-  <div class="card" id="logs-card">
-    <div class="card-title">📋 Live Log  <span style="color:var(--muted);font-weight:400;font-size:10px;cursor:pointer" onclick="toggleAutoScroll()">autoscroll: <span id="as-label">ON</span></span></div>
-    <div class="card-body" style="padding:0;height:calc(100% - 30px)">
-      <div id="log-container"></div>
-    </div>
-  </div>
-
 </div>
 
 <script>
+// ─── Tabs ─────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(tab).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ─── Settings ─────────────────────────────────────────────────────────────
+function saveKalshiKey() {
+  const keyId = document.getElementById('kalshi-key-input').value.trim();
+  if (!keyId) {
+    showMsg('Please enter a Kalshi API Key ID', 'error');
+    return;
+  }
+
+  showMsg('Saving...', 'success');
+
+  fetch('/api/config/kalshi?key_id=' + encodeURIComponent(keyId), {
+    method: 'POST',
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.ok) {
+      showMsg('Key saved! Restart the bot for changes to take effect.', 'success');
+      setTimeout(() => document.getElementById('msg').style.display = 'none', 3000);
+    } else {
+      showMsg('Error: ' + d.error, 'error');
+    }
+  })
+  .catch(e => showMsg('Error: ' + e, 'error'));
+}
+
+function stopBot() {
+  if (!confirm('Stop the trading bot?')) return;
+  fetch('/api/stop', { method: 'POST' })
+    .then(r => r.json())
+    .then(d => alert(d.message || d.error));
+}
+
+function showMsg(text, type) {
+  const msg = document.getElementById('msg');
+  msg.textContent = text;
+  msg.className = 'msg ' + type;
+  msg.style.display = 'block';
+}
+
 // ─── State ────────────────────────────────────────────────────────────────
 let ws, autoScroll = true, chartSeries = 'KXBTC15M';
 const priceHistory = { KXBTC15M: [], KXETH15M: [] };
@@ -332,7 +472,7 @@ function rebuildChart(state) {
       chart.data.labels.push(...fLabels);
       chart.data.datasets[1].data = [...Array(n).fill(null), ...fData];
       document.getElementById('chart-forecast-label').textContent =
-        `Forecast: $${fc.point?.toLocaleString('en-US',{maximumFractionDigits:0})} ±${fc.sigma?.toFixed(0)}`;
+        `Forecast: $${fc.point?.toLocaleString('en-US',{maximumFractionDigits:0})} +/-${fc.sigma?.toFixed(0)}`;
     }
   }
   chart.update('none');
@@ -347,7 +487,7 @@ function connect() {
     setDot('ok', 'Connected');
   };
   ws.onclose = () => {
-    setDot('err', 'Disconnected — reconnecting…');
+    setDot('err', 'Disconnected - reconnecting...');
     setTimeout(connect, 2000);
   };
   ws.onerror = () => setDot('warn', 'Connection error');
@@ -380,14 +520,14 @@ function renderState(s) {
   setValColor('pf-pnl',   pf.daily_pnl,     fmt$(pf.daily_pnl, true));
   setValColor('pf-pnl-pct', pf.daily_pnl_pct, fmtPct(pf.daily_pnl_pct, true));
   setValColor('pf-wr', (pf.win_rate||0) - 0.5, fmtPct((pf.win_rate||0)*100));
-  document.getElementById('pf-trades').textContent = pf.trades_recorded ?? '—';
+  document.getElementById('pf-trades').textContent = pf.trades_recorded ?? '-';
 
   // Circuit breaker
   const cb = s.circuit_breaker || {};
   const cbBar = document.getElementById('circuit-bar');
   if (cb.halted || s.captain?.halt) {
     cbBar.innerHTML = `<div class="mini-stat" style="border-color:var(--red);background:#2a0d0d;width:100%">
-      <span class="mini-val" style="color:var(--red)">⛔ HALTED</span>
+      <span class="mini-val" style="color:var(--red)">HALTED</span>
     </div>`;
   } else {
     const pct = Math.abs(pf.daily_pnl_pct || 0);
@@ -399,14 +539,14 @@ function renderState(s) {
 
   // Captain
   const cap = s.captain || {};
-  const regime = (cap.regime || '—').toLowerCase();
+  const regime = (cap.regime || '-').toLowerCase();
   const regDiv = document.getElementById('cap-regime');
-  regDiv.textContent = regime === '—' ? '—' : regime.toUpperCase();
+  regDiv.textContent = regime === '-' ? '-' : regime.toUpperCase();
   regDiv.className = 'regime regime-' + regime;
-  document.getElementById('cap-kelly').textContent = cap.kelly_mult != null ? cap.kelly_mult.toFixed(2) : '—';
-  document.getElementById('cap-edge').textContent  = cap.min_edge != null ? fmtPct(cap.min_edge * 100) : '—';
-  document.getElementById('cap-src').textContent   = cap.source || '—';
-  document.getElementById('cap-reason').textContent = cap.reasoning || '—';
+  document.getElementById('cap-kelly').textContent = cap.kelly_mult != null ? cap.kelly_mult.toFixed(2) : '-';
+  document.getElementById('cap-edge').textContent  = cap.min_edge != null ? fmtPct(cap.min_edge * 100) : '-';
+  document.getElementById('cap-src').textContent   = cap.source || '-';
+  document.getElementById('cap-reason').textContent = cap.reasoning || '-';
   document.getElementById('halt-banner').style.display = cap.halt ? '' : 'none';
 
   // Ticker / spot
@@ -458,8 +598,8 @@ function renderState(s) {
         </div>
       </div>
       <div style="font-size:10px;color:var(--muted);display:flex;justify-content:space-between">
-        <span>σ=${f.sigma?.toFixed(0)}</span>
-        <span>Q10:$${f.q10?.toLocaleString('en-US',{maximumFractionDigits:0})} — Q90:$${f.q90?.toLocaleString('en-US',{maximumFractionDigits:0})}</span>
+        <span>sigma=${f.sigma?.toFixed(0)}</span>
+        <span>Q10:$${f.q10?.toLocaleString('en-US',{maximumFractionDigits:0})} - Q90:$${f.q90?.toLocaleString('en-US',{maximumFractionDigits:0})}</span>
       </div>
       <div class="fc-bar"><div class="fc-fill" style="width:${confidence}%"></div></div>`;
     }).join('<div style="height:8px"></div>');
@@ -472,10 +612,10 @@ function renderState(s) {
   if (pos.length) {
     posBody.innerHTML = pos.map(p => {
       const tag = `<span class="tag tag-${p.side}">${p.side?.toUpperCase()}</span>`;
-      const since = p.opened_at ? new Date(p.opened_at).toLocaleTimeString() : '—';
+      const since = p.opened_at ? new Date(p.opened_at).toLocaleTimeString() : '-';
       return `<div class="pos-row">
         <div><span class="pos-ticker">${p.ticker}</span>${tag}</div>
-        <div class="pos-meta">${p.contracts} contracts @ ${p.entry_price_cents}¢ | p(win)=${(p.prob_win*100).toFixed(1)}% | since ${since}</div>
+        <div class="pos-meta">${p.contracts} contracts @ ${p.entry_price_cents}c | p(win)=${(p.prob_win*100).toFixed(1)}% | since ${since}</div>
       </div>`;
     }).join('');
   } else {
@@ -487,18 +627,18 @@ function renderState(s) {
   const tbody = document.getElementById('decisions-body');
   if (dec.length) {
     tbody.innerHTML = dec.slice(0,20).map(d => {
-      const sideTag = d.side ? `<span class="tag tag-${d.side}">${d.side?.toUpperCase()}</span>` : '<span style="color:var(--muted)">—</span>';
+      const sideTag = d.side ? `<span class="tag tag-${d.side}">${d.side?.toUpperCase()}</span>` : '<span style="color:var(--muted)">-</span>';
       const execTag = d.executed
-        ? '<span style="color:var(--green)">✓ FILLED</span>'
+        ? '<span style="color:var(--green)">FILLED</span>'
         : '<span style="color:var(--muted)">SKIP</span>';
       const edgeCol = (d.edge||0) > 0 ? 'var(--green)' : 'var(--red)';
       return `<tr>
-        <td style="color:var(--cyan)">${d.ticker||'—'}</td>
+        <td style="color:var(--cyan)">${d.ticker||'-'}</td>
         <td>${sideTag}</td>
-        <td>${d.price_cents != null ? d.price_cents + '¢' : '—'}</td>
-        <td>${d.contracts || '—'}</td>
-        <td style="color:${edgeCol}">${d.edge != null ? (d.edge*100).toFixed(1)+'¢' : '—'}</td>
-        <td>${d.mte != null ? d.mte+'m' : '—'}</td>
+        <td>${d.price_cents != null ? d.price_cents + 'c' : '-'}</td>
+        <td>${d.contracts || '-'}</td>
+        <td style="color:${edgeCol}">${d.edge != null ? (d.edge*100).toFixed(1)+'c' : '-'}</td>
+        <td>${d.mte != null ? d.mte+'m' : '-'}</td>
         <td>${execTag}</td>
       </tr>`;
     }).join('');
@@ -543,12 +683,12 @@ function toggleAutoScroll() {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 function fmt$(v, signed=false) {
-  if (v == null) return '—';
+  if (v == null) return '-';
   const s = (signed && v > 0 ? '+' : '') + '$' + Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   return signed && v < 0 ? '-' + s.slice(1) : s;
 }
 function fmtPct(v, signed=false) {
-  if (v == null) return '—';
+  if (v == null) return '-';
   return (signed && v > 0 ? '+' : '') + Number(v).toFixed(2) + '%';
 }
 function setValColor(id, val, text) {

@@ -49,6 +49,47 @@ def get_logs(n: int = 200):
     return {"lines": BotState.get_logs(n)}
 
 
+@app.post("/api/config/kalshi")
+def set_kalshi_key(key_id: str):
+    """Save Kalshi API Key ID to .env file."""
+    env_path = Path(__file__).parent.parent / ".env"
+    if not env_path.exists():
+        return {"ok": False, "error": ".env file not found"}
+
+    # Read current .env
+    content = env_path.read_text(encoding="utf-8")
+
+    # Replace or add KALSHI_API_KEY_ID
+    lines = content.split("\n")
+    found = False
+    for i, line in enumerate(lines):
+        if line.strip().startswith("KALSHI_API_KEY_ID="):
+            lines[i] = f"KALSHI_API_KEY_ID={key_id}"
+            found = True
+            break
+
+    if not found:
+        # Add it after the TRADING_MODE line
+        for i, line in enumerate(lines):
+            if line.strip().startswith("TRADING_MODE="):
+                lines.insert(i+1, f"KALSHI_API_KEY_ID={key_id}")
+                break
+
+    env_path.write_text("\n".join(lines), encoding="utf-8")
+    return {"ok": True, "message": "Kalshi key saved. Restart the bot for changes to take effect."}
+
+
+@app.post("/api/stop")
+def stop_bot():
+    """Signal the bot to stop gracefully."""
+    try:
+        # Set a flag in BotState that main.py can check
+        BotState.update({"stop_requested": True})
+        return {"ok": True, "message": "Stop signal sent. Bot will shut down gracefully."}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 # ------------------------------------------------------------------ WebSocket
 connected: set[WebSocket] = set()
 

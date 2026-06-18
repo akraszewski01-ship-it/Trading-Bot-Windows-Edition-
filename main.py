@@ -2,15 +2,9 @@
 Entry point for the Kalshi 15-minute crypto trading system (Windows edition).
 
 Wires the spot feed, Kalshi orderbook WebSocket, TimesFM forecaster and the
-Gemini "Captain" into the execution engine, then runs a set of cooperative
-asyncio loops:
-
-    feed.run()            spot price WebSocket (512-min rolling window)
-    orderbook.run()       Kalshi orderbook WebSocket
-    market_refresh_loop   discover open markets / manage subscriptions
-    forecast_loop         TimesFM forecast per series (every minute)
-    captain_loop          Gemini oversight (every 5 minutes)
-    trading_loop          timing gate + spread-crossing execution + settlement
+Gemini "Captain" into the execution engine.  The dashboard runs as a
+persistent asyncio task that survives engine stop/restart so the Start button
+in the browser can relaunch the trading engine without exiting the process.
 
 Run:
     python main.py              # paper or live per .env (TRADING_MODE)
@@ -25,13 +19,9 @@ import sys
 from src.ai import Captain, create_predictor
 from src.utils import RiskManager, get_logger, load_config, setup_logging
 
-# NOTE: src.engine pulls in httpx / websockets (network deps). It is imported
-# lazily inside run() so the offline --self-test works with only the standard
-# library + the lightweight AI/utils modules installed.
-if True:  # typing aid without importing at module load time
+if True:
     from typing import TYPE_CHECKING
-
-    if TYPE_CHECKING:  # pragma: no cover
+    if TYPE_CHECKING:
         from src.engine import ExecutionEngine, MarketDataFeed
 
 log = get_logger("main")
@@ -44,7 +34,7 @@ async def market_refresh_loop(engine: ExecutionEngine, interval: int = 30) -> No
     while True:
         try:
             await engine.refresh_markets()
-        except Exception as exc:  # pragma: no cover - defensive
+        except Exception as exc:
             log.error("market_refresh_loop: %s", exc)
         await asyncio.sleep(interval)
 
@@ -98,26 +88,24 @@ async def captain_loop(config, captain: Captain, engine: ExecutionEngine) -> Non
 
 
 async def stop_watcher(interval: int = 1) -> None:
-    """Watch BotState for a dashboard 'Stop' request and exit when set."""
+    """Return as soon as BotState carries stop_requested=True."""
     from src.utils.bot_state import BotState
     while True:
         if BotState.get().get("stop_requested"):
-            log.info("Stop requested from dashboard - shutting down...")
-            # Clear the flag so a fresh start is not immediately stopped.
-            BotState.update({"stop_requested": False, "status": "stopped"})
+            log.info("Stop requested from dashboard.")
+            BotState.update({"stop_requested": False})
             return
         await asyncio.sleep(interval)
 
 
 async def dashboard_loop(port: int = 8080) -> None:
-    """Run the monitoring dashboard IN-PROCESS so it shares BotState with the
-    trading engine (live data, working Stop button). Falls back quietly if
-    FastAPI/uvicorn are not installed."""
+    """Run the dashboard IN-PROCESS sharing BotState. Runs for the lifetime of
+    the process so the Start button works even when the engine is stopped."""
     try:
         import uvicorn
         from dashboard.server import app
-    except Exception as exc:  # pragma: no cover - optional dependency
-        log.warning("Dashboard not started (%s). Install fastapi+uvicorn to enable.", exc)
+    except Exception as exc:
+        log.warning("Dashboard not started (%s). Install fastapi+uvicorn.", exc)
         return
 
     cfg = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
@@ -153,10 +141,7 @@ async def trading_loop(engine: ExecutionEngine, interval: int = 5) -> None:
             BotState.update({
                 "status": "running",
                 "portfolio": snap,
-                "circuit_breaker": {
-                    "halted": snap.get("halted", False),
-                    "reason": "",
-                },
+                "circuit_breaker": {"halted": snap.get("halted", False), "reason": ""},
                 "positions": [
                     {
                         "ticker": t,
@@ -185,25 +170,19 @@ async def trading_loop(engine: ExecutionEngine, interval: int = 5) -> None:
 
 
 # --------------------------------------------------------------------------- #
-#  Bootstrap
+#  Engine lifecycle (can be started / stopped multiple times per process)
 # --------------------------------------------------------------------------- #
-async def run() -> None:
-    # Network-dependent engine imported here so --self-test stays offline.
-    from src.engine import (
-        ExecutionEngine,
-        KalshiClient,
-        MarketDataFeed,
-        OrderBookManager,
-    )
+async def run_engine() -> None:
+    """Bootstrap and run all trading tasks until stop is requested or a task
+    raises. Returns when the engine has stopped cleanly."""
+    from src.engine import ExecutionEngine, KalshiClient, MarketDataFeed, OrderBookManager
+    from src.utils.bot_state import BotState
 
     config = load_config()
-    setup_logging(config.log_file, config.log_level)
-
-    from src.utils.bot_state import BotState
     BotState.update({"status": "starting", "mode": config.trading_mode})
 
     log.info("=" * 70)
-    log.info("Kalshi 15m Crypto Trading System - mode=%s provider=%s series=%s",
+    log.info("Engine starting | mode=%s provider=%s series=%s",
              config.trading_mode.upper(), config.spot_provider, config.market_series)
     log.info("=" * 70)
 
@@ -211,10 +190,10 @@ async def run() -> None:
     for p in problems:
         log.warning("CONFIG: %s", p)
     if config.is_live and problems:
-        log.critical("Refusing to start LIVE with configuration problems. Exiting.")
+        log.critical("Refusing to start LIVE with configuration problems.")
+        BotState.update({"status": "stopped"})
         return
 
-    # --- Components ---------------------------------------------------------
     client = KalshiClient(config)
     orderbook = OrderBookManager(config, client)
     symbols = [config.spot_symbol(s) for s in config.market_series]
@@ -244,11 +223,9 @@ async def run() -> None:
              "gemini" if captain.enabled else "heuristic",
              portfolio_value)
 
-    # --- Warm up ------------------------------------------------------------
     await feed.seed()
     await engine.refresh_markets()
 
-    # --- Launch loops -------------------------------------------------------
     tasks = [
         asyncio.create_task(feed.run(), name="feed"),
         asyncio.create_task(orderbook.run(), name="orderbook"),
@@ -257,34 +234,69 @@ async def run() -> None:
         asyncio.create_task(captain_loop(config, captain, engine), name="captain"),
         asyncio.create_task(trading_loop(engine), name="trading"),
         asyncio.create_task(stop_watcher(), name="stop_watcher"),
-        asyncio.create_task(dashboard_loop(), name="dashboard"),
     ]
-    log.info("All systems live. %d loops running. Ctrl+C (or dashboard Stop) to stop.", len(tasks))
+    log.info("All systems live. %d loops running.", len(tasks))
+    BotState.update({"status": "running"})
 
     try:
-        # Run until any task finishes (stop_watcher returns when Stop is pressed)
-        # or one crashes.
         await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
     except asyncio.CancelledError:
         pass
     finally:
-        log.info("Shutting down...")
+        log.info("Engine shutting down...")
         feed.stop()
         orderbook.stop()
         for t in tasks:
             t.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         await client.close()
-        log.info("Shutdown complete.")
+        BotState.update({"status": "stopped"})
+        log.info("Engine stopped. Waiting for Start signal from dashboard.")
 
 
 # --------------------------------------------------------------------------- #
-#  Offline self-test (no network, no credentials)
+#  Top-level run loop — dashboard survives engine stop/restart
+# --------------------------------------------------------------------------- #
+async def run() -> None:
+    from src.utils.bot_state import BotState
+
+    config = load_config()
+    setup_logging(config.log_file, config.log_level)
+    BotState.update({"status": "starting", "mode": config.trading_mode})
+
+    # Dashboard runs for the full process lifetime so the browser Start button
+    # can signal a restart even when the trading engine is stopped.
+    dashboard_task = asyncio.create_task(dashboard_loop(), name="dashboard")
+
+    try:
+        while True:
+            await run_engine()
+
+            # Wait for a start_requested signal from the dashboard, or for the
+            # dashboard itself to exit (user closed the window / Ctrl+C).
+            log.info("Idle. Press Start in the dashboard to restart the engine.")
+            while True:
+                if dashboard_task.done():
+                    return  # dashboard died — exit the process
+                state = BotState.get()
+                if state.get("start_requested"):
+                    BotState.update({"start_requested": False})
+                    log.info("Start signal received — relaunching engine.")
+                    break
+                await asyncio.sleep(1)
+    except asyncio.CancelledError:
+        pass
+    finally:
+        dashboard_task.cancel()
+        await asyncio.gather(dashboard_task, return_exceptions=True)
+        log.info("Process exiting.")
+
+
+# --------------------------------------------------------------------------- #
+#  Offline self-test
 # --------------------------------------------------------------------------- #
 def self_test() -> int:
-    """Exercise the AI + risk path on synthetic data; verifies wiring offline."""
     import math
-
     from src.ai.captain import Captain
     from src.ai.timesfm_predictor import create_predictor
     from src.utils.risk import RiskManager
@@ -293,7 +305,6 @@ def self_test() -> int:
     config = load_config()
     log.info("SELF-TEST: synthetic series -> baseline forecast -> captain -> sizing")
 
-    # Synthetic BTC-like random walk (512 minutes).
     series = [60000.0]
     for i in range(511):
         series.append(series[-1] * (1 + 0.0002 * math.sin(i / 7) + 0.0005 * ((i % 5) - 2) / 2))
@@ -301,38 +312,19 @@ def self_test() -> int:
     predictor = create_predictor(config, force_baseline=True)
     fc = predictor.forecast(series)
     log.info("Forecast @8min: %s", fc.summary(8))
-    p_above = fc.prob_above(8, series[-1])  # P(end above current)
+    p_above = fc.prob_above(8, series[-1])
     log.info("P(spot above %.0f in 8min) = %.3f", series[-1], p_above)
 
-    captain = Captain(config)  # heuristic unless GEMINI_API_KEY set
-    decision = asyncio.run(
-        captain.review(
-            {
-                "forecast": fc.summary(8),
-                "risk": {"win_rate": 0.52, "trades_recorded": 20},
-            }
-        )
-    )
+    captain = Captain(config)
+    decision = asyncio.run(captain.review({"forecast": fc.summary(8), "risk": {"win_rate": 0.52, "trades_recorded": 20}}))
     log.info("Captain: %s", decision.summary())
 
-    risk = RiskManager(10_000, config.fractional_kelly, config.daily_stop_loss_pct,
-                       config.max_position_pct)
-
-    # Flat-edge case (market priced at fair value) -> expect ~0 contracts.
-    flat = risk.size_position(p_above, price_cents=int(p_above * 100),
-                              kelly_multiplier=decision.kelly_multiplier)
-    log.info("Sizing @fair(%dc): %d contracts ($%.2f)", int(p_above * 100),
-             flat.contracts, flat.dollars)
-
-    # Edge case: model 5c richer than the market -> expect a real position.
+    risk = RiskManager(10_000, config.fractional_kelly, config.daily_stop_loss_pct, config.max_position_pct)
+    flat = risk.size_position(p_above, price_cents=int(p_above * 100), kelly_multiplier=decision.kelly_multiplier)
+    log.info("Sizing @fair(%dc): %d contracts ($%.2f)", int(p_above * 100), flat.contracts, flat.dollars)
     edge_px = max(1, int(p_above * 100) - 5)
-    sized = risk.size_position(p_above, price_cents=edge_px,
-                               kelly_multiplier=decision.kelly_multiplier)
-    log.info("Sizing @edge(%dc): %d contracts ($%.2f), kelly_raw=%.3f applied=%.3f capped=%s",
-             edge_px, sized.contracts, sized.dollars, sized.kelly_fraction_raw,
-             sized.kelly_fraction_applied, sized.capped_by_max_position)
-
-    # Circuit-breaker check.
+    sized = risk.size_position(p_above, price_cents=edge_px, kelly_multiplier=decision.kelly_multiplier)
+    log.info("Sizing @edge(%dc): %d contracts ($%.2f)", edge_px, sized.contracts, sized.dollars)
     allowed, why = risk.can_trade()
     log.info("Circuit breaker: can_trade=%s (%s)", allowed, why)
     log.info("SELF-TEST OK")
@@ -340,20 +332,17 @@ def self_test() -> int:
 
 
 # --------------------------------------------------------------------------- #
-#  Windows-compatible entry
+#  Entry
 # --------------------------------------------------------------------------- #
 def main() -> int:
-    # Windows 11: the Proactor event loop is required for robust async I/O.
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-
     if "--self-test" in sys.argv:
         return self_test()
-
     try:
         asyncio.run(run())
     except KeyboardInterrupt:
-        log.info("Interrupted by user - exiting.")
+        log.info("Interrupted by user.")
     return 0
 
 

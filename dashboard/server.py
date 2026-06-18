@@ -1,11 +1,6 @@
 """
-Dashboard WebSocket server.
-
-Run alongside main.py in a separate terminal:
-    python dashboard/server.py
-
-Opens a browser at http://localhost:8080 showing the live trading dashboard.
-Streams state + logs over WebSocket every second.
+Dashboard FastAPI server — runs inside main.py as an asyncio task so it
+shares the in-process BotState singleton with the trading engine.
 """
 from __future__ import annotations
 
@@ -15,17 +10,17 @@ import os
 import sys
 from pathlib import Path
 
-# Allow imports from the project root.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 try:
     from fastapi import Body, FastAPI, WebSocket, WebSocketDisconnect
-    from fastapi.responses import HTMLResponse
+    from fastapi.responses import HTMLResponse, JSONResponse
     from fastapi.staticfiles import StaticFiles
+    import httpx
     import uvicorn
 except ImportError:
-    print("ERROR: Run 'pip install fastapi uvicorn' to use the dashboard.")
+    print("ERROR: Run 'pip install fastapi uvicorn httpx' to use the dashboard.")
     sys.exit(1)
 
 from src.utils.bot_state import BotState
@@ -35,13 +30,29 @@ app = FastAPI(title="Kalshi Trading Bot Dashboard")
 STATIC = Path(__file__).parent / "static"
 ENV_PATH = PROJECT_ROOT / ".env"
 KEY_PATH = PROJECT_ROOT / "secrets" / "kalshi_private_key.pem"
+KALSHI_API = "https://api.elections.kalshi.com/trade-api/v2"
+ALLOWED_SERIES = {"KXBTC15M", "KXETH15M"}
 
-# Serve static assets (JS/CSS if extracted).
 if STATIC.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
 
-# ------------------------------------------------------------------ REST
+# ------------------------------------------------------------------ helpers
+def _set_env_var(name: str, value: str) -> None:
+    lines = []
+    if ENV_PATH.exists():
+        lines = ENV_PATH.read_text(encoding="utf-8").split("\n")
+    prefix = f"{name}="
+    for i, line in enumerate(lines):
+        if line.strip().startswith(prefix):
+            lines[i] = f"{name}={value}"
+            break
+    else:
+        lines.append(f"{name}={value}")
+    ENV_PATH.write_text("\n".join(lines), encoding="utf-8")
+
+
+# ------------------------------------------------------------------ REST: state
 @app.get("/api/state")
 def get_state():
     return BotState.get()
@@ -52,26 +63,37 @@ def get_logs(n: int = 200):
     return {"lines": BotState.get_logs(n)}
 
 
-def _set_env_var(name: str, value: str) -> None:
-    """Insert or replace a KEY=value line in the .env file (creating it if needed)."""
-    lines = []
-    if ENV_PATH.exists():
-        lines = ENV_PATH.read_text(encoding="utf-8").split("\n")
-
-    prefix = f"{name}="
-    for i, line in enumerate(lines):
-        if line.strip().startswith(prefix):
-            lines[i] = f"{name}={value}"
-            break
-    else:
-        lines.append(f"{name}={value}")
-
-    ENV_PATH.write_text("\n".join(lines), encoding="utf-8")
+# ------------------------------------------------------------------ REST: control
+@app.post("/api/stop")
+def stop_bot():
+    state = BotState.get()
+    if state.get("status") in ("stopped",):
+        return {"ok": False, "error": "Bot is already stopped."}
+    try:
+        BotState.update({"stop_requested": True})
+        return {"ok": True, "message": "Stop signal sent. The engine will shut down momentarily."}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
+@app.post("/api/start")
+def start_bot():
+    state = BotState.get()
+    status = state.get("status", "stopped")
+    if status == "running":
+        return {"ok": False, "error": "Engine is already running."}
+    if status == "starting":
+        return {"ok": False, "error": "Engine is already starting up..."}
+    try:
+        BotState.update({"start_requested": True, "status": "starting"})
+        return {"ok": True, "message": "Start signal sent. The engine is launching..."}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# ------------------------------------------------------------------ REST: config
 @app.get("/api/config/status")
 def config_status():
-    """Report what credentials are currently configured (no secrets returned)."""
     key_id = ""
     if ENV_PATH.exists():
         for line in ENV_PATH.read_text(encoding="utf-8").split("\n"):
@@ -90,46 +112,81 @@ def config_status():
 
 @app.post("/api/config/kalshi")
 def set_kalshi_credentials(payload: dict = Body(...)):
-    """Save Kalshi API Key ID (.env) and/or the private key PEM (secrets/)."""
     key_id = (payload.get("key_id") or "").strip()
     private_key = (payload.get("private_key") or "").strip()
-
     saved = []
     try:
         if key_id:
             _set_env_var("KALSHI_API_KEY_ID", key_id)
             saved.append("API Key ID")
-
         if private_key:
-            # Basic sanity check that it looks like a PEM.
             if "BEGIN" not in private_key or "PRIVATE KEY" not in private_key:
-                return {"ok": False, "error": "That does not look like a private key. It should start with -----BEGIN ... PRIVATE KEY-----"}
+                return {"ok": False, "error": "That does not look like a private key — it should start with -----BEGIN ... PRIVATE KEY-----"}
             KEY_PATH.parent.mkdir(parents=True, exist_ok=True)
-            # Normalise line endings and ensure a trailing newline.
             pem = private_key.replace("\r\n", "\n").strip() + "\n"
             KEY_PATH.write_text(pem, encoding="utf-8")
             saved.append("private key")
-
         if not saved:
-            return {"ok": False, "error": "Nothing to save - enter a key ID and/or private key."}
-
-        return {
-            "ok": True,
-            "message": f"Saved: {', '.join(saved)}. Press Stop, then start the bot again to apply.",
-        }
+            return {"ok": False, "error": "Nothing to save — enter a Key ID and/or private key."}
+        return {"ok": True, "message": f"Saved: {', '.join(saved)}. Press Stop then Start to apply."}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
 
-@app.post("/api/stop")
-def stop_bot():
-    """Signal the bot to stop gracefully (works because the dashboard runs
-    in the same process as the engine and shares BotState)."""
+# ------------------------------------------------------------------ REST: Kalshi market proxy
+@app.get("/api/kalshi/{series}")
+async def kalshi_market(series: str):
+    """Proxy public Kalshi API for live market data — no auth required."""
+    if series not in ALLOWED_SERIES:
+        return JSONResponse({"error": "Unknown series"}, status_code=400)
+
     try:
-        BotState.update({"stop_requested": True})
-        return {"ok": True, "message": "Stop signal sent. The bot will shut down in a moment."}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+        async with httpx.AsyncClient(timeout=6.0) as client:
+            # Fetch the most recently expiring open market for this series
+            r = await client.get(
+                f"{KALSHI_API}/markets",
+                params={"series_ticker": series, "status": "open", "limit": 5},
+            )
+            if r.status_code != 200:
+                return {"error": f"Kalshi API {r.status_code}", "markets": []}
+
+            markets = r.json().get("markets", [])
+            if not markets:
+                return {"series": series, "markets": [], "orderbook": None, "trades": []}
+
+            # Pick the market expiring soonest (first in list from Kalshi)
+            market = markets[0]
+            ticker = market["ticker"]
+
+            # Fetch orderbook and recent trades in parallel
+            ob_task = client.get(f"{KALSHI_API}/markets/{ticker}/orderbook", params={"depth": 8})
+            tr_task = client.get(f"{KALSHI_API}/markets/{ticker}/trades", params={"limit": 25})
+            ob_r, tr_r = await asyncio.gather(ob_task, tr_task, return_exceptions=True)
+
+            orderbook = ob_r.json() if not isinstance(ob_r, Exception) and ob_r.status_code == 200 else {}
+            trades_raw = tr_r.json() if not isinstance(tr_r, Exception) and tr_r.status_code == 200 else {}
+
+            return {
+                "series": series,
+                "market": {
+                    "ticker": market.get("ticker"),
+                    "title": market.get("title", ""),
+                    "yes_bid": market.get("yes_bid"),
+                    "yes_ask": market.get("yes_ask"),
+                    "no_bid": market.get("no_bid"),
+                    "no_ask": market.get("no_ask"),
+                    "last_price": market.get("last_price"),
+                    "volume": market.get("volume", 0),
+                    "volume_24h": market.get("volume_24h", 0),
+                    "open_interest": market.get("open_interest", 0),
+                    "expiration_time": market.get("expiration_time"),
+                    "liquidity": market.get("liquidity", 0),
+                },
+                "orderbook": orderbook.get("orderbook", {}),
+                "trades": trades_raw.get("trades", []),
+            }
+    except Exception as exc:
+        return {"error": str(exc), "series": series, "markets": []}
 
 
 # ------------------------------------------------------------------ WebSocket
@@ -140,7 +197,6 @@ connected: set[WebSocket] = set()
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
     connected.add(ws)
-    # Send last 100 log lines immediately on connect.
     try:
         await ws.send_text(json.dumps({
             "type": "init",
@@ -167,17 +223,8 @@ def index():
     return HTMLResponse("<h1>Dashboard starting...</h1><p>Static files not found.</p>")
 
 
-# ------------------------------------------------------------------ main
+# ------------------------------------------------------------------ standalone
 if __name__ == "__main__":
     port = int(os.environ.get("DASHBOARD_PORT", 8080))
-    print(f"\n  Dashboard -> http://localhost:{port}")
-    print(f"  Open this address in your browser.\n")
-    # Pass the app object directly (not an import string) so this works no
-    # matter how the script is launched - no dependence on sys.path / package
-    # name resolution.
-    uvicorn.run(
-        app,
-        host="127.0.0.1",
-        port=port,
-        log_level="warning",
-    )
+    print(f"\n  Dashboard -> http://localhost:{port}\n")
+    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")

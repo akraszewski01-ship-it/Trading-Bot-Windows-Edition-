@@ -1,0 +1,62 @@
+name: Build Release Package
+
+on:
+  push:
+    branches:
+      - claude/inspiring-gates-kpc47z
+  workflow_dispatch:  # allow manual trigger
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create release ZIP
+        run: |
+          mkdir -p build
+          cd build
+          cp -r .. kalshi-trading-bot
+          cd kalshi-trading-bot
+          # Clean up git and temp files
+          rm -rf .git .github trading.log* __pycache__ .pytest_cache .venv venv env
+          find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+          find . -type f -name "*.pyc" -delete
+          cd ..
+          zip -r kalshi-trading-bot.zip kalshi-trading-bot/ -q
+          ls -lh kalshi-trading-bot.zip
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/kalshi-trading-bot.zip
+          tag_name: v1.0.0-${{ github.run_number }}
+          name: Kalshi Trading Bot (Build ${{ github.run_number }})
+          body: |
+            ## 📦 Kalshi Trading Bot - Ready to Run
+
+            ### Quick Start:
+            1. **Extract** `kalshi-trading-bot.zip`
+            2. **Double-click** `SETUP.bat` (or run `SETUP.ps1`)
+            3. **Edit** `.env` with your API keys
+            4. **Run** `python main.py`
+
+            ### What's Included:
+            - ✅ Complete trading engine (Kalshi, TimesFM, Gemini Captain)
+            - ✅ Automated setup scripts (batch + PowerShell)
+            - ✅ Configuration templates
+            - ✅ Offline self-test
+
+            ### Requirements:
+            - Windows 10/11
+            - Python 3.11+
+
+            ### API Keys Needed:
+            - **Kalshi**: [Account → API Keys](https://kalshi.com)
+            - **Gemini**: [Google AI Studio](https://aistudio.google.com)
+
+            For full documentation, see `README.md` after extraction.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

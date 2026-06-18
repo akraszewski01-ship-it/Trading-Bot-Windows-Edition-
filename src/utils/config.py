@@ -11,12 +11,13 @@ import os
 from dataclasses import dataclass, field
 from typing import Dict, List
 
-try:  # python-dotenv is optional at import time but recommended.
+try:
     from dotenv import load_dotenv
-
     load_dotenv()
-except Exception:  # pragma: no cover - dotenv simply not installed
-    pass
+except ImportError:
+    import sys
+    print("WARNING: python-dotenv not installed. Environment variables will not be loaded from .env file.", file=sys.stderr)
+    print("Run: pip install python-dotenv", file=sys.stderr)
 
 
 # Mapping of Kalshi series -> spot symbol on each supported exchange.

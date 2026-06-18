@@ -1,0 +1,105 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║            HOW TO START THE KALSHI TRADING BOT — STEP BY STEP              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  FIRST TIME ONLY — Run Setup
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. Open the Trading-Bot-Windows-Edition- folder in Windows Explorer.
+
+  2. Double-click  SETUP.bat
+
+     You will see:
+       [✓] Python found
+       [1/5] Creating virtual environment...
+       [2/5] Activating...
+       [3/5] Installing dependencies...   ← this takes 2-3 minutes
+       [4/5] Setting up configuration...
+       [5/5] Running self-test...
+       SELF-TEST PASSED!
+
+  3. If SETUP.bat says "Python not found":
+       → Download Python 3.11 from  https://www.python.org/downloads/
+       → Run the installer
+       → IMPORTANT: tick "Add Python to PATH" at the bottom of the installer
+       → Restart your computer
+       → Double-click SETUP.bat again
+
+  Setup only needs to be done ONCE.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  EVERY TIME — Start the Bot
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Double-click  START.bat
+
+  → A SECOND window opens running the dashboard server.
+  → Your browser opens  http://localhost:8080  automatically.
+  → The FIRST (main) window shows live trading logs.
+
+  To stop: close both windows, or press Ctrl+C in each.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  IF START.bat DOESN'T WORK — Manual method (type these commands)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Step A: Open Command Prompt in the bot folder
+    Right-click the Trading-Bot-Windows-Edition- folder
+    → "Open in Terminal"  (or "Open command window here")
+
+  Step B: In the Command Prompt window, type each line and press Enter:
+
+    .venv\Scripts\activate
+    python main.py
+
+  Step C: Open a SECOND Command Prompt in the same folder and type:
+
+    .venv\Scripts\activate
+    python dashboard\server.py
+
+  Step D: Open your browser and go to:  http://localhost:8080
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  WHAT THE DASHBOARD SHOWS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Portfolio PnL        Today's profit/loss in dollars and percent
+  Captain (AI)         Gemini's market regime assessment and reasoning
+  Live Spot Ticker     Real-time BTC / ETH price from Coinbase
+  Forecast             TimesFM probability for the next 15-min bar
+  Open Positions       Contracts currently held + unrealised PnL
+  Trade Decisions      Every signal the engine evaluated
+  Live Logs            Raw log stream (same as the terminal window)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PAPER MODE vs LIVE MODE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  The bot starts in PAPER MODE by default — no real money is traded.
+  To switch to live trading, open .env with Notepad and change:
+
+    TRADING_MODE=paper
+         →  to
+    TRADING_MODE=live
+
+  Only do this after you have watched the bot run in paper mode and are
+  satisfied with its behaviour.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  COMMON ERRORS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  "Python not found"
+    → See PYTHON-PATH-FIX.md, or reinstall Python with "Add to PATH" ticked.
+
+  "Not set up yet. Please run SETUP.bat first."
+    → Double-click SETUP.bat before START.bat.
+
+  Window closes instantly
+    → Right-click the .bat file → "Run as administrator"
+    → Or use the manual method above so you can see the error.
+
+  Dashboard shows "Connecting..."
+    → Make sure BOTH windows are open (bot + dashboard).
+    → Try refreshing the browser page after 10 seconds.

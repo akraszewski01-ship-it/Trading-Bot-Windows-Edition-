@@ -6,9 +6,9 @@ prices per symbol, seeded from REST history and kept current over WebSocket.
 
 Two providers are supported behind one interface:
 
-* **coinbase** (default, US-friendly) — REST candles + ``ticker`` channel
+* **coinbase** (default, US-friendly) - REST candles + ``ticker`` channel
   aggregated into one-minute bars.
-* **binance** — REST klines + ``@kline_1m`` combined stream (uses the exchange's
+* **binance** - REST klines + ``@kline_1m`` combined stream (uses the exchange's
   own one-minute bar close).
 """
 
@@ -152,7 +152,7 @@ class MarketDataFeed:
                 raise
             except Exception as exc:
                 self._connected = False
-                log.error("Spot feed (%s) error: %s — reconnect in %ss",
+                log.error("Spot feed (%s) error: %s - reconnect in %ss",
                           self.provider, exc, backoff)
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, 30)
@@ -202,7 +202,7 @@ class MarketDataFeed:
             self._cur_minute[symbol] = minute
             self._last_px[symbol] = price
         elif minute > prev:
-            # The previous minute has closed — commit its last price.
+            # The previous minute has closed - commit its last price.
             self._append(symbol, self._last_px[symbol])
             self._cur_minute[symbol] = minute
             self._last_px[symbol] = price

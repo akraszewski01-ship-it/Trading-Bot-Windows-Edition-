@@ -45,19 +45,19 @@ def setup_logging(
     root.setLevel(getattr(logging, level.upper(), logging.INFO))
     formatter = logging.Formatter(_FORMAT, datefmt=_DATEFMT)
 
-    # Rotating file handler — the durable audit trail.
+    # Rotating file handler - the durable audit trail.
     file_handler = RotatingFileHandler(
         log_file, maxBytes=max_bytes, backupCount=backups, encoding="utf-8"
     )
     file_handler.setFormatter(formatter)
     root.addHandler(file_handler)
 
-    # Console handler — operator visibility.
+    # Console handler - operator visibility.
     console = logging.StreamHandler(stream=sys.stdout)
     console.setFormatter(formatter)
     root.addHandler(console)
 
-    # Dashboard in-memory handler — feeds the live log panel.
+    # Dashboard in-memory handler - feeds the live log panel.
     dash = _DashboardHandler()
     dash.setFormatter(formatter)
     root.addHandler(dash)

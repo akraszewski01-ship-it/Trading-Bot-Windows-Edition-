@@ -179,7 +179,7 @@ class OrderBookManager:
                 raise
             except Exception as exc:
                 self._connected = False
-                log.error("Orderbook WS error: %s — reconnecting in %ss", exc, backoff)
+                log.error("Orderbook WS error: %s - reconnecting in %ss", exc, backoff)
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, 30)
 
@@ -187,7 +187,7 @@ class OrderBookManager:
         url = self.config.kalshi_ws_url
         headers = self.client.ws_auth_headers()
         if not headers:
-            log.warning("Connecting to Kalshi WS without auth (no key) — %s", url)
+            log.warning("Connecting to Kalshi WS without auth (no key) - %s", url)
 
         async with _ws_connect(url, headers) as ws:
             self._connected = True
@@ -274,7 +274,7 @@ class OrderBookManager:
         # Gap detection: a missed sequence means our book is stale.
         if seq != book.seq + 1:
             log.warning(
-                "Seq gap on %s (have %d, got %d) — forcing resubscribe",
+                "Seq gap on %s (have %d, got %d) - forcing resubscribe",
                 ticker, book.seq, seq,
             )
             self._resubscribe.set()

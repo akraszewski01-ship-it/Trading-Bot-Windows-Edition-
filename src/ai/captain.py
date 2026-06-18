@@ -1,5 +1,5 @@
 """
-The "Captain" — an oversight layer powered by Google's Gemini.
+The "Captain" - an oversight layer powered by Google's Gemini.
 
 Every few minutes the trading loop hands the Captain a context payload (TimesFM
 forecast summary, Kalshi orderbook skew, recent win/loss and PnL). The Captain
@@ -33,7 +33,7 @@ from ..utils.logger import get_logger
 log = get_logger("captain")
 
 _REGIMES = ("trend", "range", "choppy")
-_MAX_EDGE_THRESHOLD = 0.50  # 50 cents — sanity clamp
+_MAX_EDGE_THRESHOLD = 0.50  # 50 cents - sanity clamp
 
 _SYSTEM_PROMPT = """\
 You are "The Captain", the risk-oversight authority for an automated trading
@@ -106,10 +106,10 @@ class Captain:
                 self._init_model()
                 log.info("Captain online (Gemini model=%s)", config.gemini_model)
             except Exception as exc:
-                log.error("Captain init failed (%s) — heuristic fallback", exc)
+                log.error("Captain init failed (%s) - heuristic fallback", exc)
                 self.enabled = False
         else:
-            log.warning("GEMINI_API_KEY not set — Captain runs in heuristic mode")
+            log.warning("GEMINI_API_KEY not set - Captain runs in heuristic mode")
 
     # --------------------------------------------------------------- model init
     def _init_model(self) -> None:
@@ -173,7 +173,7 @@ class Captain:
             log.info("Captain %s", decision.summary())
             return decision
         except Exception as exc:
-            log.error("Captain review failed (%s) — reusing last decision", exc)
+            log.error("Captain review failed (%s) - reusing last decision", exc)
             return self.last_decision
 
     # -------------------------------------------------------------- validation

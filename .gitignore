@@ -9,6 +9,8 @@ secrets/
 logs/
 trading.log*
 state/
+setup-log.txt
+selftest-output.txt
 
 # Python
 __pycache__/

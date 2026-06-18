@@ -1,126 +1,161 @@
 @echo off
 setlocal enabledelayedexpansion
 
+REM --- Always run from the folder this file lives in --------------------------
+cd /d "%~dp0"
+
+REM --- Everything also gets written to setup-log.txt so nothing is lost --------
+set "LOG=setup-log.txt"
+echo Kalshi Trading Bot - setup log > "%LOG%"
+echo Started: %date% %time% >> "%LOG%"
+echo Folder : %~dp0 >> "%LOG%"
+
 echo.
 echo ============================================================================
 echo   Kalshi Trading Bot - Windows Setup
 echo ============================================================================
 echo.
+echo   A full copy of this output is being saved to:  setup-log.txt
+echo   If anything fails, open that file (or send it over) to diagnose.
+echo.
 
-REM Try 'py' first (Windows launcher), then 'python'
+REM --- 1. Find Python (try the 'py' launcher first, then 'python') ------------
+set "PY="
 py --version >nul 2>&1
-if errorlevel 1 (
+if not errorlevel 1 (
+    set "PY=py"
+) else (
     python --version >nul 2>&1
-    if errorlevel 1 (
-        echo ERROR: Python not found in PATH
-        echo.
-        echo SOLUTIONS:
-        echo 1. Reinstall Python from https://www.python.org
-        echo    - During installation, CHECK "Add Python to PATH"
-        echo    - Then click INSTALL NOW (not "Disable PATH length limit")
-        echo.
-        echo 2. Or manually add Python to PATH:
-        echo    - Find your Python installation folder
-        echo      (usually C:\Users\[YourName]\AppData\Local\Programs\Python\Python311)
-        echo    - Right-click "This PC" ^> Properties ^> Advanced system settings
-        echo    - Environment Variables ^> PATH ^> Edit
-        echo    - Add the Python folder path
-        echo    - Restart this batch file
-        echo.
-        echo 3. Test: Open Command Prompt and type "python --version"
-        echo    It should show Python 3.11 or higher
-        echo.
-        pause
-        exit /b 1
-    )
-    set PYTHON=python
-) else (
-    set PYTHON=py
+    if not errorlevel 1 set "PY=python"
 )
 
-echo [✓] Python found using: %PYTHON%
-%PYTHON% --version
+if "%PY%"=="" (
+    echo PYTHON NOT FOUND >> "%LOG%"
+    echo ERROR: Python was not found on this computer.
+    echo.
+    echo   Fix it like this:
+    echo     1. Go to  https://www.python.org/downloads/
+    echo     2. Download Python 3.11 or newer and run the installer
+    echo     3. TICK the box "Add Python to PATH" at the bottom
+    echo     4. Click Install, then RESTART your computer
+    echo     5. Double-click SETUP.bat again
+    echo.
+    echo   (More help is in PYTHON-PATH-FIX.md)
+    echo.
+    echo ----------------------------------------------------------------------------
+    echo   Press any key to close this window.
+    pause >nul
+    exit /b 1
+)
 
-echo [1/5] Creating virtual environment...
+echo [OK] Python found using: %PY%
+%PY% --version
+%PY% --version >> "%LOG%" 2>&1
+echo Using: %PY% >> "%LOG%"
+
+REM --- 2. Create the virtual environment -------------------------------------
+echo.
+echo [1/5] Creating virtual environment (.venv)...
 if not exist ".venv" (
-    %PYTHON% -m venv .venv
+    %PY% -m venv .venv >> "%LOG%" 2>&1
     if errorlevel 1 (
-        echo ERROR: Failed to create virtual environment
-        pause
+        echo VENV CREATION FAILED >> "%LOG%"
+        echo ERROR: Could not create the virtual environment.
+        echo        See setup-log.txt for details.
+        echo.
+        echo   Press any key to close this window.
+        pause >nul
         exit /b 1
     )
 ) else (
-    echo Virtual environment already exists, skipping creation.
+    echo       .venv already exists - reusing it.
 )
 
+REM --- 3. Activate it --------------------------------------------------------
 echo [2/5] Activating virtual environment...
-call .venv\Scripts\activate.bat
+call ".venv\Scripts\activate.bat"
 if errorlevel 1 (
-    echo ERROR: Failed to activate virtual environment
-    pause
+    echo VENV ACTIVATION FAILED >> "%LOG%"
+    echo ERROR: Could not activate the virtual environment.
+    echo        Try deleting the .venv folder and running SETUP.bat again.
+    echo.
+    echo   Press any key to close this window.
+    pause >nul
     exit /b 1
 )
 
-echo [3/5] Installing dependencies (this may take 2-3 minutes)...
-pip install -q --upgrade pip
-pip install -q -r requirements.txt
+REM --- 4. Install dependencies ------------------------------------------------
+echo [3/5] Installing dependencies...
+echo       This downloads several packages and can take 2-4 minutes.
+echo       The window may look frozen during install - please WAIT, do not close it.
+echo.
+python -m pip install --upgrade pip >> "%LOG%" 2>&1
+python -m pip install -r requirements.txt >> "%LOG%" 2>&1
 if errorlevel 1 (
-    echo ERROR: Failed to install dependencies
-    echo Try running this again, or install manually:
-    echo   pip install -r requirements.txt
-    pause
+    echo PIP INSTALL FAILED >> "%LOG%"
+    echo ERROR: Some dependencies failed to install.
+    echo        The details are in setup-log.txt.
+    echo.
+    echo        You can try again, or install manually:
+    echo            .venv\Scripts\activate
+    echo            pip install -r requirements.txt
+    echo.
+    echo   Press any key to close this window.
+    pause >nul
     exit /b 1
 )
+echo       Dependencies installed.
 
+REM --- 5. Configuration files -------------------------------------------------
 echo [4/5] Setting up configuration...
 if not exist ".env" (
-    copy .env.example .env >nul
-    echo Created .env - you still need to add your API keys (see below)
+    if exist ".env.example" (
+        copy ".env.example" ".env" >nul
+        echo       Created .env  (remember to add your API keys).
+    ) else (
+        echo       NOTE: no .env or .env.example found.
+    )
 ) else (
-    echo .env already exists, skipping.
+    echo       .env already exists - keeping it.
 )
+if not exist "secrets" mkdir secrets
 
-if not exist "secrets" (
-    mkdir secrets
-    echo Created secrets\ folder
-)
-
+REM --- 6. Offline self-test --------------------------------------------------
 echo [5/5] Running offline self-test...
-python main.py --self-test
-if errorlevel 1 (
-    echo WARNING: Self-test failed. Check the error above.
-) else (
-    echo SELF-TEST PASSED!
-)
+echo. >> "%LOG%"
+echo ===== SELF-TEST OUTPUT ===== >> "%LOG%"
+python main.py --self-test > selftest-output.txt 2>&1
+type selftest-output.txt
+type selftest-output.txt >> "%LOG%"
+
+set "SELFTEST_OK=0"
+findstr /C:"SELF-TEST OK" selftest-output.txt >nul 2>&1
+if not errorlevel 1 set "SELFTEST_OK=1"
+del selftest-output.txt >nul 2>&1
 
 echo.
 echo ============================================================================
-echo   Setup Complete!
-echo ============================================================================
-echo.
-echo NEXT STEPS:
-echo -----------
-echo.
-echo 1. Add your API keys to .env:
-echo    - KALSHI_API_KEY_ID: your UUID from Kalshi dashboard
-echo    - GEMINI_API_KEY: already set in .env
-echo    - Private key: secrets\kalshi_private_key.pem (already set up)
-echo.
-echo 2. Edit .env:
-echo    notepad .env
-echo.
-echo 3. Run the trading bot (Terminal 1):
-echo    python main.py
-echo.
-echo 4. Run the dashboard (Terminal 2):
-echo    python dashboard\server.py
-echo    Then open: http://localhost:8080
-echo.
-echo 5. Monitor via the web dashboard:
-echo    - Live spot prices + price chart
-echo    - Captain's AI reasoning + regime
-echo    - Open positions + trade decisions
-echo    - Portfolio PnL + circuit breakers
-echo    - Live log stream
-echo.
-pause
+if "%SELFTEST_OK%"=="1" (
+    echo   SETUP COMPLETE - SELF-TEST PASSED
+    echo ============================================================================
+    echo.
+    echo   The bot is ready to run in PAPER mode (no real money).
+    echo.
+    echo   Press any key to START THE BOT now,
+    echo   or just close this window to start it later with START.bat
+    echo.
+    pause >nul
+    echo Launching the bot...
+    call "%~dp0START.bat"
+    exit /b 0
+) else (
+    echo   SETUP FINISHED, BUT THE SELF-TEST DID NOT PASS
+    echo ============================================================================
+    echo.
+    echo   Please open  setup-log.txt  in this folder and review the errors,
+    echo   or send that file over so it can be diagnosed.
+    echo.
+    echo   Press any key to close this window.
+    pause >nul
+    exit /b 1
+)

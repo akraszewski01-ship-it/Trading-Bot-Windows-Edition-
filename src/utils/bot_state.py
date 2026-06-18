@@ -17,7 +17,7 @@ class BotState:
         "mode": "paper",
         "ts": "",
         "portfolio": {"value": 0.0, "daily_pnl": 0.0, "daily_pnl_pct": 0.0, "win_rate": 0.0, "trades": 0},
-        "captain": {"regime": "—", "kelly_mult": 0.0, "min_edge": 0.0, "halt": False, "reasoning": "Waiting for first review…", "source": "—"},
+        "captain": {"regime": "-", "kelly_mult": 0.0, "min_edge": 0.0, "halt": False, "reasoning": "Waiting for first review...", "source": "-"},
         "forecasts": {},
         "positions": [],
         "quotes": {},

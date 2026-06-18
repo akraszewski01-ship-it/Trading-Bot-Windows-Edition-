@@ -81,17 +81,20 @@ def index():
     html_path = STATIC / "index.html"
     if html_path.exists():
         return HTMLResponse(html_path.read_text(encoding="utf-8"))
-    return HTMLResponse("<h1>Dashboard starting…</h1><p>Static files not found.</p>")
+    return HTMLResponse("<h1>Dashboard starting...</h1><p>Static files not found.</p>")
 
 
 # ------------------------------------------------------------------ main
 if __name__ == "__main__":
     port = int(os.environ.get("DASHBOARD_PORT", 8080))
-    print(f"\n  Dashboard → http://localhost:{port}\n")
+    print(f"\n  Dashboard -> http://localhost:{port}")
+    print(f"  Open this address in your browser.\n")
+    # Pass the app object directly (not an import string) so this works no
+    # matter how the script is launched - no dependence on sys.path / package
+    # name resolution.
     uvicorn.run(
-        "dashboard.server:app",
-        host="0.0.0.0",
+        app,
+        host="127.0.0.1",
         port=port,
-        reload=False,
         log_level="warning",
     )

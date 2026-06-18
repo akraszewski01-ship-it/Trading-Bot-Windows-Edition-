@@ -3,18 +3,18 @@ Execution engine.
 
 Fuses every signal into trade decisions and (paper or live) orders:
 
-* **Market discovery** — pulls open markets per series, parses strike/expiry and
+* **Market discovery** - pulls open markets per series, parses strike/expiry and
   keeps the orderbook WebSocket subscribed to soon-to-expire markets.
-* **Timing gate** — a market is only *evaluated* when it is between
+* **Timing gate** - a market is only *evaluated* when it is between
   ``trade_window_min`` and ``trade_window_max`` minutes from expiry (default
-  6–9 min).
-* **Spread-crossing logic** — a market order is only sent when the statistical
+  6-9 min).
+* **Spread-crossing logic** - a market order is only sent when the statistical
   edge (model probability vs. orderbook mid) exceeds the live spread *plus* a
   dynamic buffer (base buffer + Captain's ``min_edge_threshold`` + a volatility
   term).
-* **Risk** — Kelly sizing scaled by the Captain's multiplier, behind hard
+* **Risk** - Kelly sizing scaled by the Captain's multiplier, behind hard
   circuit breakers.
-* **Settlement** — paper trades settle against realised spot; live trades reconcile
+* **Settlement** - paper trades settle against realised spot; live trades reconcile
   from Kalshi settlements.
 """
 
@@ -291,7 +291,7 @@ class ExecutionEngine:
             d.side = None
             return d
 
-        # --- Sizing (Kelly × fractional × captain), capped by liquidity ---------
+        # --- Sizing (Kelly x fractional x captain), capped by liquidity ---------
         sizing = self.risk.size_position(prob_win, d.price_cents, self._captain.kelly_multiplier)
         contracts = min(sizing.contracts, max(0, int(available)))
         d.contracts = contracts
@@ -326,7 +326,7 @@ class ExecutionEngine:
             return
 
         if not self.client.is_authenticated:
-            log.critical("LIVE mode but Kalshi client is not authenticated — skipping order")
+            log.critical("LIVE mode but Kalshi client is not authenticated - skipping order")
             d.reason += " | BLOCKED: no auth"
             return
 

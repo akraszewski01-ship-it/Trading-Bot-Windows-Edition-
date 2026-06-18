@@ -170,7 +170,7 @@ async def run() -> None:
     BotState.update({"status": "starting", "mode": config.trading_mode})
 
     log.info("=" * 70)
-    log.info("Kalshi 15m Crypto Trading System — mode=%s provider=%s series=%s",
+    log.info("Kalshi 15m Crypto Trading System - mode=%s provider=%s series=%s",
              config.trading_mode.upper(), config.spot_provider, config.market_series)
     log.info("=" * 70)
 
@@ -231,7 +231,7 @@ async def run() -> None:
     except asyncio.CancelledError:
         pass
     finally:
-        log.info("Shutting down…")
+        log.info("Shutting down...")
         feed.stop()
         orderbook.stop()
         for t in tasks:
@@ -254,7 +254,7 @@ def self_test() -> int:
 
     setup_logging("trading.log", "INFO")
     config = load_config()
-    log.info("SELF-TEST: synthetic series → baseline forecast → captain → sizing")
+    log.info("SELF-TEST: synthetic series -> baseline forecast -> captain -> sizing")
 
     # Synthetic BTC-like random walk (512 minutes).
     series = [60000.0]
@@ -281,13 +281,13 @@ def self_test() -> int:
     risk = RiskManager(10_000, config.fractional_kelly, config.daily_stop_loss_pct,
                        config.max_position_pct)
 
-    # Flat-edge case (market priced at fair value) → expect ~0 contracts.
+    # Flat-edge case (market priced at fair value) -> expect ~0 contracts.
     flat = risk.size_position(p_above, price_cents=int(p_above * 100),
                               kelly_multiplier=decision.kelly_multiplier)
     log.info("Sizing @fair(%dc): %d contracts ($%.2f)", int(p_above * 100),
              flat.contracts, flat.dollars)
 
-    # Edge case: model 5c richer than the market → expect a real position.
+    # Edge case: model 5c richer than the market -> expect a real position.
     edge_px = max(1, int(p_above * 100) - 5)
     sized = risk.size_position(p_above, price_cents=edge_px,
                                kelly_multiplier=decision.kelly_multiplier)
@@ -316,7 +316,7 @@ def main() -> int:
     try:
         asyncio.run(run())
     except KeyboardInterrupt:
-        log.info("Interrupted by user — exiting.")
+        log.info("Interrupted by user - exiting.")
     return 0
 
 

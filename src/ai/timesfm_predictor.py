@@ -23,7 +23,7 @@ from ..utils.logger import get_logger
 
 log = get_logger("timesfm")
 
-# 10th/90th percentile of a standard normal: z ≈ ±1.2816.
+# 10th/90th percentile of a standard normal: z ~ +/-1.2816.
 _Z90 = 1.2815515594
 
 
@@ -109,7 +109,7 @@ class TimesFMPredictor:
         import timesfm  # heavy import deferred until needed
 
         log.info(
-            "Loading TimesFM (%s, backend=%s, context=%d, horizon=%d)…",
+            "Loading TimesFM (%s, backend=%s, context=%d, horizon=%d)...",
             self.config.timesfm_repo_id,
             self.config.timesfm_backend,
             self.config.context_len,
@@ -214,6 +214,6 @@ def create_predictor(config: Config, force_baseline: bool = False):
         return TimesFMPredictor(config)
     except Exception as exc:
         log.warning(
-            "Forecaster: TimesFM unavailable (%s) — using BaselineForecaster", exc
+            "Forecaster: TimesFM unavailable (%s) - using BaselineForecaster", exc
         )
         return BaselineForecaster(config)

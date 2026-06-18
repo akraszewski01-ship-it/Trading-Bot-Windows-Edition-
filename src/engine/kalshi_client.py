@@ -11,7 +11,7 @@ The signed ``path`` includes the ``/trade-api/v2`` prefix but **excludes** any
 query string. The same signing scheme is used to authenticate the WebSocket
 handshake (method ``GET``, path ``/trade-api/ws/v2``).
 
-Public market-data endpoints (``GET /markets`` …) work without signing, so the
+Public market-data endpoints (``GET /markets`` ...) work without signing, so the
 client degrades gracefully in paper mode when no private key is configured.
 """
 
@@ -159,7 +159,7 @@ class KalshiClient:
                     raise
                 backoff = 2 ** (attempt - 1)
                 log.warning(
-                    "Kalshi %s %s failed (attempt %d/%d): %s — retrying in %ss",
+                    "Kalshi %s %s failed (attempt %d/%d): %s - retrying in %ss",
                     method, endpoint, attempt, retries, exc, backoff,
                 )
                 await asyncio.sleep(backoff)
@@ -184,7 +184,7 @@ class KalshiClient:
         return data.get("market", {})
 
     async def get_orderbook(self, ticker: str, depth: int = 10) -> Dict[str, Any]:
-        """REST orderbook snapshot — a fallback for the WebSocket feed."""
+        """REST orderbook snapshot - a fallback for the WebSocket feed."""
         data = await self._request(
             "GET", f"/markets/{ticker}/orderbook", params={"depth": depth}, signed=False
         )

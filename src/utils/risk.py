@@ -46,7 +46,7 @@ class TradeResult:
 
 @dataclass
 class PositionSizing:
-    """Result of a sizing request — fully transparent for the audit log."""
+    """Result of a sizing request - fully transparent for the audit log."""
 
     contracts: int
     dollars: float
@@ -64,7 +64,7 @@ def kelly_fraction(prob_win: float, price_cents: float) -> float:
     Optimal Kelly fraction for a binary contract.
 
     Buying at ``c = price_cents/100`` dollars wins ``(1 - c)`` and loses ``c``.
-    Net odds ``b = (1 - c) / c`` →  ``f* = p - (1 - p) / b``.
+    Net odds ``b = (1 - c) / c`` ->  ``f* = p - (1 - p) / b``.
 
     Returns 0.0 when the bet is non-positive-expectancy or the price is
     degenerate.
@@ -120,7 +120,7 @@ class RiskManager:
         today = self._today()
         if today != self._day:
             log.info(
-                "New trading day %s — resetting daily PnL (prev day pnl=%.2f)",
+                "New trading day %s - resetting daily PnL (prev day pnl=%.2f)",
                 today,
                 self.daily_pnl,
             )
@@ -186,7 +186,7 @@ class RiskManager:
         Compute the number of contracts to buy.
 
         ``kelly_multiplier`` comes from the Captain (0..1). The final fraction is
-        ``kelly* × fractional_kelly × kelly_multiplier`` and the resulting dollar
+        ``kelly* x fractional_kelly x kelly_multiplier`` and the resulting dollar
         notional is capped at ``max_position_pct`` of the portfolio.
         """
         with self._lock:

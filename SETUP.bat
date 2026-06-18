@@ -82,12 +82,19 @@ echo.
 echo 2. Edit .env:
 echo    notepad .env
 echo.
-echo 3. Run the trading system (paper mode, safe):
+echo 3. Run the trading bot (Terminal 1):
 echo    python main.py
 echo.
-echo 4. Monitor the logs:
-echo    - Console output (live)
-echo    - trading.log (rotating file, for audit)
+echo 4. Run the dashboard (Terminal 2):
+echo    python dashboard\server.py
+echo    Then open: http://localhost:8080
+echo.
+echo 5. Monitor via the web dashboard:
+echo    - Live spot prices + price chart
+echo    - Captain's AI reasoning + regime
+echo    - Open positions + trade decisions
+echo    - Portfolio PnL + circuit breakers
+echo    - Live log stream
 echo.
 echo IMPORTANT:
 echo - Always test in PAPER MODE (TRADING_MODE=paper) first

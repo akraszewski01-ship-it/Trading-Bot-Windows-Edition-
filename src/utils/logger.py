@@ -20,6 +20,16 @@ _FORMAT = "%(asctime)s | %(levelname)-8s | %(name)-22s | %(message)s"
 _DATEFMT = "%Y-%m-%d %H:%M:%S"
 
 
+class _DashboardHandler(logging.Handler):
+    """Forwards every log record to BotState so the dashboard can stream it."""
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            from .bot_state import BotState
+            BotState.push_log(self.format(record))
+        except Exception:
+            pass
+
+
 def setup_logging(
     log_file: str = "trading.log",
     level: str = "INFO",
@@ -42,10 +52,15 @@ def setup_logging(
     file_handler.setFormatter(formatter)
     root.addHandler(file_handler)
 
-    # Console handler — operator visibility. Force UTF-8 on Windows consoles.
+    # Console handler — operator visibility.
     console = logging.StreamHandler(stream=sys.stdout)
     console.setFormatter(formatter)
     root.addHandler(console)
+
+    # Dashboard in-memory handler — feeds the live log panel.
+    dash = _DashboardHandler()
+    dash.setFormatter(formatter)
+    root.addHandler(dash)
 
     # Tame noisy third-party libraries.
     for noisy in ("httpx", "websockets", "urllib3", "google", "httpcore"):

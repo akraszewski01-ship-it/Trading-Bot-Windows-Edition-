@@ -14,6 +14,10 @@ python-dotenv>=1.0.0      # .env configuration loading
 cryptography>=42.0.0      # RSA-PSS request signing for Kalshi v2 API
 kalshi-python>=2.0.0      # Official SDK (optional; custom signed client used)
 
+# --- Dashboard ---------------------------------------------------------------
+fastapi>=0.111.0          # REST + WebSocket server for the monitoring dashboard
+uvicorn[standard]>=0.29.0 # ASGI server (Windows-compatible)
+
 # --- AI layer ----------------------------------------------------------------
 google-generativeai>=0.8.0   # "Captain" oversight via Gemini
 timesfm[torch]>=1.2.0        # Google Time Series Foundation Model (forecasting)

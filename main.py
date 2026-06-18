@@ -50,44 +50,102 @@ async def market_refresh_loop(engine: ExecutionEngine, interval: int = 30) -> No
 
 
 async def forecast_loop(config, feed: MarketDataFeed, predictor, engine: ExecutionEngine) -> None:
+    from src.utils.bot_state import BotState
     minute = int((config.trade_window_min + config.trade_window_max) / 2)
     while True:
+        forecasts_snap = {}
+        spot_snap = {}
         for series in config.market_series:
             symbol = config.spot_symbol(series)
+            latest = feed.latest(symbol)
+            if latest:
+                spot_snap[series] = round(latest, 2)
             if not feed.ready(symbol):
-                log.debug("Forecast skipped for %s — warming up (%d pts)",
-                          series, len(feed.get_window(symbol)))
                 continue
             try:
-                # TimesFM inference is CPU-heavy and synchronous — offload it.
                 forecast = await asyncio.to_thread(predictor.forecast, feed.get_window(symbol))
                 engine.update_forecast(series, forecast)
+                forecasts_snap[series] = forecast.summary(minute)
                 log.info("Forecast %s: %s", series, forecast.summary(minute))
             except Exception as exc:
                 log.error("forecast_loop %s: %s", series, exc)
+        BotState.update({"forecasts": forecasts_snap, "spot": spot_snap})
         await asyncio.sleep(config.forecast_interval_sec)
 
 
 async def captain_loop(config, captain: Captain, engine: ExecutionEngine) -> None:
-    await asyncio.sleep(15)  # let the first forecast populate
+    from src.utils.bot_state import BotState
+    await asyncio.sleep(15)
     while True:
         try:
             context = engine.build_captain_context()
             decision = await captain.review(context)
             engine.apply_captain(decision)
+            BotState.update({
+                "captain": {
+                    "regime": decision.market_regime,
+                    "kelly_mult": decision.kelly_multiplier,
+                    "min_edge": decision.min_edge_threshold,
+                    "halt": decision.halt_trading,
+                    "reasoning": decision.reasoning,
+                    "source": decision.source,
+                    "ts": decision.ts.isoformat(),
+                }
+            })
         except Exception as exc:
             log.error("captain_loop: %s", exc)
         await asyncio.sleep(config.captain_interval_sec)
 
 
 async def trading_loop(engine: ExecutionEngine, interval: int = 5) -> None:
+    from src.utils.bot_state import BotState
     while True:
         try:
             decisions = await engine.evaluate()
             for d in decisions:
                 if d.side or d.executed:
                     log.info("DECISION %s", d.log_line())
+                    BotState.push_decision({
+                        "ticker": d.ticker,
+                        "side": d.side,
+                        "contracts": d.contracts,
+                        "price_cents": d.price_cents,
+                        "edge": round(d.edge, 4),
+                        "executed": d.executed,
+                        "reason": d.reason,
+                        "mte": round(d.minutes_to_expiry, 1),
+                    })
             await engine.settle()
+            snap = engine.risk.snapshot()
+            BotState.update({
+                "status": "running",
+                "portfolio": snap,
+                "circuit_breaker": {
+                    "halted": snap.get("halted", False),
+                    "reason": "",
+                },
+                "positions": [
+                    {
+                        "ticker": t,
+                        "side": p.side,
+                        "contracts": p.contracts,
+                        "entry_price_cents": p.entry_price_cents,
+                        "prob_win": round(p.prob_win, 3),
+                        "opened_at": p.opened_at.isoformat(),
+                    }
+                    for t, p in engine._open.items()
+                ],
+                "quotes": {
+                    t: {
+                        "bid": q.yes_bid,
+                        "ask": q.yes_ask,
+                        "spread": q.spread,
+                        "mid": round(q.mid, 1) if q.mid else None,
+                    }
+                    for t in list(engine._specs)[:20]
+                    if (q := engine.orderbook.get_quote(t)) and q.is_two_sided
+                },
+            })
         except Exception as exc:
             log.exception("trading_loop: %s", exc)
         await asyncio.sleep(interval)
@@ -107,6 +165,9 @@ async def run() -> None:
 
     config = load_config()
     setup_logging(config.log_file, config.log_level)
+
+    from src.utils.bot_state import BotState
+    BotState.update({"status": "starting", "mode": config.trading_mode})
 
     log.info("=" * 70)
     log.info("Kalshi 15m Crypto Trading System — mode=%s provider=%s series=%s",

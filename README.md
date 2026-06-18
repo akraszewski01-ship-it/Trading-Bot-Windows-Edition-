@@ -17,6 +17,29 @@ It pairs a quantitative execution engine with two AI layers:
 
 ---
 
+## Quick Start (one click!)
+
+**Option 1: Batch script (easiest for most users)**
+```
+Double-click SETUP.bat
+```
+
+**Option 2: PowerShell**
+```powershell
+PowerShell -ExecutionPolicy Bypass -File SETUP.ps1
+```
+
+This will:
+1. ✅ Check Python installation
+2. ✅ Create a virtual environment
+3. ✅ Install all dependencies
+4. ✅ Set up configuration files
+5. ✅ Run an offline self-test
+
+Then follow the on-screen instructions to add your API keys.
+
+---
+
 ## Architecture
 
 ```
@@ -72,50 +95,40 @@ main.py                      Async orchestrator (Windows ProactorEventLoop)
 
 ---
 
-## Setup (Windows 11)
+## Credentials setup
 
-```powershell
-# 1. Python 3.11 recommended
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
+After running the setup script, edit `.env` and add:
 
-# 2. Install deps  (PyTorch may install faster from pytorch.org first)
-pip install -r requirements.txt
+* **Kalshi API KEY ID**: your UUID from [Kalshi dashboard](https://kalshi.com) → Account → API Keys
+* **Kalshi private key**: automatically placed in `secrets/kalshi_private_key.pem`
+* **Gemini API key**: already configured (get one from [Google AI Studio](https://aistudio.google.com))
 
-# 3. Configure
-copy .env.example .env
-notepad .env          # fill in keys; keep TRADING_MODE=paper to start
-```
-
-### Credentials
-
-* **Kalshi**: create an API key (Account → API Keys). Save the downloaded
-  private key as `secrets/kalshi_private_key.pem` and set `KALSHI_API_KEY_ID`.
-* **Gemini**: get a key from Google AI Studio → `GEMINI_API_KEY`.
-
-Both AI layers degrade gracefully: without `GEMINI_API_KEY` the Captain runs a
-conservative heuristic; without `timesfm` installed the engine uses a calibrated
-statistical fallback forecaster.
+Both AI layers degrade gracefully:
+- Without `GEMINI_API_KEY`: Captain runs a conservative heuristic
+- Without `timesfm` installed: engine uses a calibrated statistical fallback
 
 ---
 
 ## Running
 
+Once setup is complete, **edit `.env` with your API keys**, then:
+
 ```powershell
-python main.py --self-test   # offline smoke test (no network/keys needed)
-python main.py               # run the system (paper or live per .env)
+python main.py
 ```
 
 Everything is logged to **`trading.log`** (rotating) and the console: TimesFM
 forecasts, Captain reasoning/decisions, trade decisions and settlements.
 
-### Going live
+### Paper → Live progression
 
-1. Run for an extended period in `paper` mode and review `trading.log`.
-2. Confirm the circuit breakers and sizing behave as expected.
-3. Set `TRADING_MODE=live` and start with a **small** `PORTFOLIO_VALUE_USD` /
-   tight `MAX_POSITION_PCT`. The engine refuses to start live with any config
-   validation errors and refuses to send orders if it cannot authenticate.
+1. ✅ **Paper mode (default)** — Run for 15–30 minutes and review `trading.log`
+2. ✅ **Verify behavior** — Confirm timing gate, edge logic, Kelly sizing
+3. ✅ **Set `TRADING_MODE=live`** — Only after validation (see `.env`)
+4. ⚠️ **Small position first** — Start with tight `MAX_POSITION_PCT`, watch real orders
+
+The engine refuses to start live with validation errors and refuses orders if it
+cannot authenticate to Kalshi.
 
 ---
 

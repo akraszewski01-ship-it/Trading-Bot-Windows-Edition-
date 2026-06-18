@@ -1,0 +1,26 @@
+# =============================================================================
+#  Kalshi 15-Minute Crypto Trading Bot — Windows Edition
+#  Production dependency set. Tested against Python 3.11 on Windows 11.
+# =============================================================================
+
+# --- Core async networking / data -------------------------------------------
+websockets>=12.0          # Kalshi + spot-feed realtime streams
+httpx>=0.27.0             # Async REST (Kalshi v2 + exchange candle seeding)
+pandas>=2.0.0
+numpy>=1.24.0
+python-dotenv>=1.0.0      # .env configuration loading
+
+# --- Kalshi authentication / SDK --------------------------------------------
+cryptography>=42.0.0      # RSA-PSS request signing for Kalshi v2 API
+kalshi-python>=2.0.0      # Official SDK (optional; custom signed client used)
+
+# --- AI layer ----------------------------------------------------------------
+google-generativeai>=0.8.0   # "Captain" oversight via Gemini
+timesfm[torch]>=1.2.0        # Google Time Series Foundation Model (forecasting)
+
+# NOTE:
+#   * timesfm[torch] pulls in PyTorch + a ~500M parameter checkpoint on first
+#     run. It is only required for live forecasting. The system ships with a
+#     statistical BaselineForecaster fallback so the engine can be smoke-tested
+#     (paper mode) without the heavy model installed.
+#   * On Windows, install PyTorch first per https://pytorch.org if you need GPU.

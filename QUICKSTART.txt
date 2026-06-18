@@ -34,18 +34,36 @@
 
   Double-click  START.bat
 
-  → A SECOND window opens running the dashboard server.
+  → The bot starts in this window (dashboard is built in).
   → Your browser opens  http://localhost:8080  automatically.
-  → The FIRST (main) window shows live trading logs.
+  → Live trading logs show in the window.
 
-  To stop: close both windows, or press Ctrl+C in each.
+  To stop: click the red "Stop Bot" button on the dashboard,
+           or press Ctrl+C in the window.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ENTERING YOUR KALSHI KEY (do this once)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  You need TWO things from Kalshi (Account > API Keys):
+    1. API Key ID  (a UUID like 82c55031-c47c-472e-9715-5b6c4edac900)
+    2. Private key file  (the .pem/key file downloaded when you made the key)
+
+  In the dashboard:
+    1. Click the "Settings" tab at the top
+    2. Paste your API Key ID in box 1
+    3. Open your private key file in Notepad, copy ALL of it,
+       and paste it into box 2
+    4. Click "Save Credentials"
+    5. The status should show "Ready: YES"
+    6. Click "Stop Bot", then run START.bat again to apply
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   IF START.bat DOESN'T WORK — Manual method (type these commands)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Step A: Open Command Prompt in the bot folder
-    Right-click the Trading-Bot-Windows-Edition- folder
+    Right-click the bot folder
     → "Open in Terminal"  (or "Open command window here")
 
   Step B: In the Command Prompt window, type each line and press Enter:
@@ -53,12 +71,8 @@
     .venv\Scripts\activate
     python main.py
 
-  Step C: Open a SECOND Command Prompt in the same folder and type:
-
-    .venv\Scripts\activate
-    python dashboard\server.py
-
-  Step D: Open your browser and go to:  http://localhost:8080
+  Step C: Open your browser and go to:  http://localhost:8080
+          (the dashboard is built into the bot - no second window needed)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   WHAT THE DASHBOARD SHOWS

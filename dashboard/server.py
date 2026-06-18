@@ -16,10 +16,11 @@ import sys
 from pathlib import Path
 
 # Allow imports from the project root.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 try:
-    from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+    from fastapi import Body, FastAPI, WebSocket, WebSocketDisconnect
     from fastapi.responses import HTMLResponse
     from fastapi.staticfiles import StaticFiles
     import uvicorn
@@ -32,6 +33,8 @@ from src.utils.bot_state import BotState
 app = FastAPI(title="Kalshi Trading Bot Dashboard")
 
 STATIC = Path(__file__).parent / "static"
+ENV_PATH = PROJECT_ROOT / ".env"
+KEY_PATH = PROJECT_ROOT / "secrets" / "kalshi_private_key.pem"
 
 # Serve static assets (JS/CSS if extracted).
 if STATIC.exists():
@@ -49,43 +52,82 @@ def get_logs(n: int = 200):
     return {"lines": BotState.get_logs(n)}
 
 
-@app.post("/api/config/kalshi")
-def set_kalshi_key(key_id: str):
-    """Save Kalshi API Key ID to .env file."""
-    env_path = Path(__file__).parent.parent / ".env"
-    if not env_path.exists():
-        return {"ok": False, "error": ".env file not found"}
+def _set_env_var(name: str, value: str) -> None:
+    """Insert or replace a KEY=value line in the .env file (creating it if needed)."""
+    lines = []
+    if ENV_PATH.exists():
+        lines = ENV_PATH.read_text(encoding="utf-8").split("\n")
 
-    # Read current .env
-    content = env_path.read_text(encoding="utf-8")
-
-    # Replace or add KALSHI_API_KEY_ID
-    lines = content.split("\n")
-    found = False
+    prefix = f"{name}="
     for i, line in enumerate(lines):
-        if line.strip().startswith("KALSHI_API_KEY_ID="):
-            lines[i] = f"KALSHI_API_KEY_ID={key_id}"
-            found = True
+        if line.strip().startswith(prefix):
+            lines[i] = f"{name}={value}"
             break
+    else:
+        lines.append(f"{name}={value}")
 
-    if not found:
-        # Add it after the TRADING_MODE line
-        for i, line in enumerate(lines):
-            if line.strip().startswith("TRADING_MODE="):
-                lines.insert(i+1, f"KALSHI_API_KEY_ID={key_id}")
+    ENV_PATH.write_text("\n".join(lines), encoding="utf-8")
+
+
+@app.get("/api/config/status")
+def config_status():
+    """Report what credentials are currently configured (no secrets returned)."""
+    key_id = ""
+    if ENV_PATH.exists():
+        for line in ENV_PATH.read_text(encoding="utf-8").split("\n"):
+            if line.strip().startswith("KALSHI_API_KEY_ID="):
+                key_id = line.split("=", 1)[1].strip()
                 break
+    placeholder = (not key_id) or key_id.startswith("your-")
+    pem_ok = KEY_PATH.exists() and KEY_PATH.stat().st_size > 100
+    return {
+        "key_id_set": bool(key_id) and not placeholder,
+        "key_id_masked": (key_id[:8] + "..." + key_id[-4:]) if (key_id and not placeholder and len(key_id) > 12) else "",
+        "private_key_present": pem_ok,
+        "ready_for_live": (bool(key_id) and not placeholder and pem_ok),
+    }
 
-    env_path.write_text("\n".join(lines), encoding="utf-8")
-    return {"ok": True, "message": "Kalshi key saved. Restart the bot for changes to take effect."}
+
+@app.post("/api/config/kalshi")
+def set_kalshi_credentials(payload: dict = Body(...)):
+    """Save Kalshi API Key ID (.env) and/or the private key PEM (secrets/)."""
+    key_id = (payload.get("key_id") or "").strip()
+    private_key = (payload.get("private_key") or "").strip()
+
+    saved = []
+    try:
+        if key_id:
+            _set_env_var("KALSHI_API_KEY_ID", key_id)
+            saved.append("API Key ID")
+
+        if private_key:
+            # Basic sanity check that it looks like a PEM.
+            if "BEGIN" not in private_key or "PRIVATE KEY" not in private_key:
+                return {"ok": False, "error": "That does not look like a private key. It should start with -----BEGIN ... PRIVATE KEY-----"}
+            KEY_PATH.parent.mkdir(parents=True, exist_ok=True)
+            # Normalise line endings and ensure a trailing newline.
+            pem = private_key.replace("\r\n", "\n").strip() + "\n"
+            KEY_PATH.write_text(pem, encoding="utf-8")
+            saved.append("private key")
+
+        if not saved:
+            return {"ok": False, "error": "Nothing to save - enter a key ID and/or private key."}
+
+        return {
+            "ok": True,
+            "message": f"Saved: {', '.join(saved)}. Press Stop, then start the bot again to apply.",
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 @app.post("/api/stop")
 def stop_bot():
-    """Signal the bot to stop gracefully."""
+    """Signal the bot to stop gracefully (works because the dashboard runs
+    in the same process as the engine and shares BotState)."""
     try:
-        # Set a flag in BotState that main.py can check
         BotState.update({"stop_requested": True})
-        return {"ok": True, "message": "Stop signal sent. Bot will shut down gracefully."}
+        return {"ok": True, "message": "Stop signal sent. The bot will shut down in a moment."}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 

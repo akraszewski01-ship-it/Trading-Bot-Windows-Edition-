@@ -97,6 +97,39 @@ async def captain_loop(config, captain: Captain, engine: ExecutionEngine) -> Non
         await asyncio.sleep(config.captain_interval_sec)
 
 
+async def stop_watcher(interval: int = 1) -> None:
+    """Watch BotState for a dashboard 'Stop' request and exit when set."""
+    from src.utils.bot_state import BotState
+    while True:
+        if BotState.get().get("stop_requested"):
+            log.info("Stop requested from dashboard - shutting down...")
+            # Clear the flag so a fresh start is not immediately stopped.
+            BotState.update({"stop_requested": False, "status": "stopped"})
+            return
+        await asyncio.sleep(interval)
+
+
+async def dashboard_loop(port: int = 8080) -> None:
+    """Run the monitoring dashboard IN-PROCESS so it shares BotState with the
+    trading engine (live data, working Stop button). Falls back quietly if
+    FastAPI/uvicorn are not installed."""
+    try:
+        import uvicorn
+        from dashboard.server import app
+    except Exception as exc:  # pragma: no cover - optional dependency
+        log.warning("Dashboard not started (%s). Install fastapi+uvicorn to enable.", exc)
+        return
+
+    cfg = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
+    server = uvicorn.Server(cfg)
+    log.info("Dashboard -> http://localhost:%d", port)
+    try:
+        await server.serve()
+    except asyncio.CancelledError:
+        server.should_exit = True
+        raise
+
+
 async def trading_loop(engine: ExecutionEngine, interval: int = 5) -> None:
     from src.utils.bot_state import BotState
     while True:
@@ -223,11 +256,15 @@ async def run() -> None:
         asyncio.create_task(forecast_loop(config, feed, predictor, engine), name="forecast"),
         asyncio.create_task(captain_loop(config, captain, engine), name="captain"),
         asyncio.create_task(trading_loop(engine), name="trading"),
+        asyncio.create_task(stop_watcher(), name="stop_watcher"),
+        asyncio.create_task(dashboard_loop(), name="dashboard"),
     ]
-    log.info("All systems live. %d loops running. Ctrl+C to stop.", len(tasks))
+    log.info("All systems live. %d loops running. Ctrl+C (or dashboard Stop) to stop.", len(tasks))
 
     try:
-        await asyncio.gather(*tasks)
+        # Run until any task finishes (stop_watcher returns when Stop is pressed)
+        # or one crashes.
+        await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
     except asyncio.CancelledError:
         pass
     finally:

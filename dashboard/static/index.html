@@ -311,31 +311,61 @@
 <div id="settings" class="tab-content">
   <div class="settings-content">
     <div class="settings-form">
-      <h2 style="color:var(--cyan);margin-bottom:20px;font-size:16px">Configuration</h2>
+      <h2 style="color:var(--cyan);margin-bottom:6px;font-size:16px">Kalshi Credentials</h2>
+      <p style="color:var(--muted);font-size:11px;margin-bottom:16px">
+        Authenticating needs TWO things: your API Key ID and your private key file.
+        Enter them below and they will be saved on this computer.
+      </p>
+
+      <!-- Current status -->
+      <div id="auth-status" style="margin-bottom:20px;padding:10px;border:1px solid var(--border);border-radius:4px;background:var(--bg3)">
+        <div style="display:flex;justify-content:space-between;padding:3px 0">
+          <span style="color:var(--muted)">API Key ID</span>
+          <span id="st-keyid" style="font-weight:700">checking...</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:3px 0">
+          <span style="color:var(--muted)">Private key file</span>
+          <span id="st-pem" style="font-weight:700">checking...</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:3px 0;border-top:1px solid var(--border);margin-top:4px;padding-top:6px">
+          <span style="color:var(--muted)">Ready to authenticate</span>
+          <span id="st-ready" style="font-weight:700">checking...</span>
+        </div>
+      </div>
 
       <div class="form-group">
-        <label class="form-label">Kalshi API Key ID</label>
-        <input type="text" id="kalshi-key-input" class="form-input" placeholder="Enter your API Key ID from Kalshi dashboard">
-        <div class="form-help">Find this at Kalshi.com > Account > API Keys. It looks like a UUID: 82c55031-c47c-472e-9715-5b6c4edac900</div>
+        <label class="form-label">1. Kalshi API Key ID</label>
+        <input type="text" id="kalshi-key-input" class="form-input" placeholder="e.g. 82c55031-c47c-472e-9715-5b6c4edac900">
+        <div class="form-help">From Kalshi.com &gt; Account &gt; API Keys. It is a UUID (letters, numbers, dashes).</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">2. Private Key (PEM)</label>
+        <textarea id="kalshi-pem-input" class="form-input" rows="8" style="resize:vertical;font-size:11px"
+          placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...paste the entire contents of your .pem / key file here...&#10;-----END RSA PRIVATE KEY-----"></textarea>
+        <div class="form-help">
+          This is the key file Kalshi gave you when you created the API key (downloaded once).
+          Open it in Notepad, select all, copy, and paste it here. Leave blank if already saved.
+        </div>
       </div>
 
       <div class="form-actions">
-        <button class="btn" onclick="saveKalshiKey()">Save Key</button>
+        <button class="btn" onclick="saveKalshiKey()">Save Credentials</button>
+        <button class="btn" onclick="refreshStatus()">Refresh Status</button>
       </div>
 
       <div id="msg" class="msg"></div>
 
       <hr style="border:none;border-top:1px solid var(--border);margin:30px 0">
 
-      <h3 style="color:var(--cyan);margin-bottom:12px;font-size:14px">About this system</h3>
+      <h3 style="color:var(--cyan);margin-bottom:12px;font-size:14px">Paper vs Live</h3>
       <div style="color:var(--muted);font-size:11px;line-height:1.6">
-        <p>Kalshi Trading Bot - a production-grade automated trading system for Kalshi's 15-minute crypto markets.</p>
-        <p style="margin-top:10px">The system runs in PAPER mode by default (no real money). To trade live:</p>
+        <p>The system runs in PAPER mode by default (no real money). To trade live:</p>
         <ul style="margin:8px 0 0 20px">
-          <li>Enter your Kalshi API Key above and save it</li>
-          <li>Verify the bot works in paper mode for 15-30 minutes</li>
-          <li>Edit .env and change TRADING_MODE from "paper" to "live"</li>
-          <li>Restart the bot</li>
+          <li>Save both credentials above (status shows "Ready: YES")</li>
+          <li>Run in paper mode for 15-30 minutes and review the logs</li>
+          <li>Edit the .env file and change TRADING_MODE from "paper" to "live"</li>
+          <li>Press Stop, then start the bot again</li>
         </ul>
       </div>
     </div>
@@ -349,26 +379,31 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(tab).classList.add('active');
   event.target.classList.add('active');
+  if (tab === 'settings') refreshStatus();
 }
 
 // ─── Settings ─────────────────────────────────────────────────────────────
 function saveKalshiKey() {
   const keyId = document.getElementById('kalshi-key-input').value.trim();
-  if (!keyId) {
-    showMsg('Please enter a Kalshi API Key ID', 'error');
+  const pem = document.getElementById('kalshi-pem-input').value.trim();
+  if (!keyId && !pem) {
+    showMsg('Enter your API Key ID and/or paste your private key first.', 'error');
     return;
   }
 
   showMsg('Saving...', 'success');
 
-  fetch('/api/config/kalshi?key_id=' + encodeURIComponent(keyId), {
+  fetch('/api/config/kalshi', {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key_id: keyId, private_key: pem }),
   })
   .then(r => r.json())
   .then(d => {
     if (d.ok) {
-      showMsg('Key saved! Restart the bot for changes to take effect.', 'success');
-      setTimeout(() => document.getElementById('msg').style.display = 'none', 3000);
+      showMsg(d.message, 'success');
+      document.getElementById('kalshi-pem-input').value = '';  // clear secret from screen
+      refreshStatus();
     } else {
       showMsg('Error: ' + d.error, 'error');
     }
@@ -376,11 +411,25 @@ function saveKalshiKey() {
   .catch(e => showMsg('Error: ' + e, 'error'));
 }
 
+function refreshStatus() {
+  fetch('/api/config/status')
+    .then(r => r.json())
+    .then(d => {
+      const yes = '<span style="color:var(--green)">YES</span>';
+      const no  = '<span style="color:var(--red)">NO</span>';
+      document.getElementById('st-keyid').innerHTML = d.key_id_set ? (yes + ' ' + (d.key_id_masked||'')) : no;
+      document.getElementById('st-pem').innerHTML   = d.private_key_present ? yes : no;
+      document.getElementById('st-ready').innerHTML = d.ready_for_live ? yes : no;
+    })
+    .catch(() => {});
+}
+
 function stopBot() {
-  if (!confirm('Stop the trading bot?')) return;
+  if (!confirm('Stop the trading bot? You will need to start it again from START.bat.')) return;
   fetch('/api/stop', { method: 'POST' })
     .then(r => r.json())
-    .then(d => alert(d.message || d.error));
+    .then(d => alert(d.message || d.error || 'Stop signal sent.'))
+    .catch(e => alert('Error: ' + e));
 }
 
 function showMsg(text, type) {

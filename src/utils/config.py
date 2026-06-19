@@ -150,8 +150,11 @@ def load_config() -> Config:
         timesfm_repo_id=_get("TIMESFM_REPO_ID", "google/timesfm-2.0-500m-pytorch"),
         spot_provider=_get("SPOT_PROVIDER", "coinbase").lower(),
         market_series=series,
-        trade_window_min=_get_float("TRADE_WINDOW_MIN", 6.0),
-        trade_window_max=_get_float("TRADE_WINDOW_MAX", 9.0),
+        # Wider default window (0-13 min) so the bot evaluates markets across
+        # most of their life and trades actively in paper mode. Narrow it via
+        # .env for a more selective live strategy.
+        trade_window_min=_get_float("TRADE_WINDOW_MIN", 0.0),
+        trade_window_max=_get_float("TRADE_WINDOW_MAX", 13.0),
         base_edge_buffer=_get_float("BASE_EDGE_BUFFER", 0.02),
         portfolio_value_usd=_get_float("PORTFOLIO_VALUE_USD", 10_000.0),
         fractional_kelly=_get_float("FRACTIONAL_KELLY", 0.25),

@@ -65,6 +65,14 @@ async def forecast_loop(config, feed: MarketDataFeed, predictor, engine: Executi
 
 async def captain_loop(config, captain: Captain, engine: ExecutionEngine) -> None:
     from src.utils.bot_state import BotState
+    # Publish the Captain wiring status immediately so the dashboard can show
+    # "Gemini live" vs "SDK missing" vs "no key" before the first review runs.
+    BotState.update({"captain": {
+        "regime": "-", "kelly_mult": 0.0, "min_edge": 0.0, "halt": False,
+        "reasoning": "Captain initialising...",
+        "source": "gemini" if captain.enabled else "heuristic",
+        "status_detail": captain.status_detail,
+    }})
     await asyncio.sleep(15)
     while True:
         try:
@@ -79,6 +87,7 @@ async def captain_loop(config, captain: Captain, engine: ExecutionEngine) -> Non
                     "halt": decision.halt_trading,
                     "reasoning": decision.reasoning,
                     "source": decision.source,
+                    "status_detail": captain.status_detail,
                     "ts": decision.ts.isoformat(),
                 }
             })

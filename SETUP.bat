@@ -92,14 +92,30 @@ echo [4/6] Installing Python dependencies...
 echo       (this downloads packages and can take 2-4 minutes)
 echo       Upgrading pip...
 python -m pip install --upgrade pip --quiet
-echo       Installing requirements...
-python -m pip install -r requirements.txt --quiet
+echo       Installing CORE requirements (bot + dashboard + Gemini)...
+python -m pip install -r requirements.txt
 if errorlevel 1 (
-    echo ERROR: Failed to install requirements
+    echo.
+    echo ERROR: Failed to install core requirements.
+    echo If you saw "filename or extension is too long", move this folder to a
+    echo short path like  C:\Bot  and run SETUP.bat again.
     pause
     exit /b 1
 )
-echo       OK
+echo       Core OK
+
+echo.
+echo       Installing OPTIONAL TimesFM model (PyTorch, large)...
+echo       This is best-effort - if it fails the bot still runs with its
+echo       built-in baseline forecaster.
+python -m pip install -r requirements-optional.txt
+if errorlevel 1 (
+    echo       NOTE: TimesFM/PyTorch did not install. That is OK - the bot
+    echo       will use the baseline forecaster. You can retry later with:
+    echo         .venv\Scripts\activate ^&^& pip install -r requirements-optional.txt
+) else (
+    echo       TimesFM OK
+)
 
 REM --- SETUP CONFIG ---
 echo.

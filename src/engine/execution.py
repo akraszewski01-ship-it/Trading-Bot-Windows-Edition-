@@ -270,6 +270,26 @@ class ExecutionEngine:
             if q and q.is_two_sided:
                 quoted += 1
 
+        # A sample of the soonest-expiring markets with strike + quote info, so
+        # the dashboard can show exactly what the engine is looking at.
+        sample = []
+        specs_sorted = sorted(
+            self._specs.values(),
+            key=lambda s: (s.minutes_to_expiry(now) is None, s.minutes_to_expiry(now) or 1e9),
+        )
+        for spec in specs_sorted[:8]:
+            mte = spec.minutes_to_expiry(now)
+            q = self.orderbook.get_quote(spec.ticker)
+            sample.append({
+                "ticker": spec.ticker,
+                "mte": round(mte, 1) if mte is not None else None,
+                "kind": spec.classify(),
+                "in_window": (mte is not None
+                              and self.config.trade_window_min <= mte <= self.config.trade_window_max),
+                "yes_bid": q.yes_bid if q else None,
+                "yes_ask": q.yes_ask if q else None,
+            })
+
         return {
             "kalshi_authenticated": self.client.is_authenticated,
             "orderbook_connected": self.orderbook.is_connected,
@@ -283,6 +303,7 @@ class ExecutionEngine:
             "per_series": per_series,
             "trade_window": [self.config.trade_window_min, self.config.trade_window_max],
             "skip_reasons": dict(list(self._last_eval.items())[:12]),
+            "market_sample": sample,
         }
 
     def _evaluate_market(self, spec: MarketSpec, mte: float) -> Optional[TradeDecision]:

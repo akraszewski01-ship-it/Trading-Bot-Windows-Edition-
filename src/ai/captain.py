@@ -100,16 +100,30 @@ class Captain:
         self.enabled = bool(config.gemini_api_key)
         self.last_decision = CaptainDecision.conservative_default()
         self._model = None
+        # Precise human-readable status for the dashboard / logs.
+        self.status_detail = "starting"
 
-        if self.enabled:
-            try:
-                self._init_model()
-                log.info("Captain online (Gemini model=%s)", config.gemini_model)
-            except Exception as exc:
-                log.error("Captain init failed (%s) - heuristic fallback", exc)
-                self.enabled = False
-        else:
+        if not config.gemini_api_key:
+            self.status_detail = "no_api_key"
             log.warning("GEMINI_API_KEY not set - Captain runs in heuristic mode")
+            return
+
+        try:
+            self._init_model()
+            self.status_detail = "live"
+            log.info("Captain online (Gemini model=%s)", config.gemini_model)
+        except ImportError as exc:
+            self.enabled = False
+            self.status_detail = "sdk_missing"
+            log.error(
+                "Captain: google-generativeai not installed (%s). "
+                "Run: pip install google-generativeai  -- using heuristic for now.",
+                exc,
+            )
+        except Exception as exc:
+            self.enabled = False
+            self.status_detail = f"init_failed: {exc}"
+            log.error("Captain init failed (%s) - heuristic fallback", exc)
 
     # --------------------------------------------------------------- model init
     def _init_model(self) -> None:

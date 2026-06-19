@@ -161,6 +161,17 @@ button { cursor:pointer; font-family:var(--ui) }
   background:rgba(246,201,14,.07); border:1px solid rgba(246,201,14,.25); color:var(--yellow);
 }
 .diag-why b { color:var(--text) }
+.diag-hint {
+  margin:-2px 0 6px; padding:6px 9px; border-radius:5px; font-size:10.5px; line-height:1.5;
+  background:rgba(239,83,80,.08); border:1px solid rgba(239,83,80,.3); color:var(--red2);
+}
+.diag-hint b { color:#fff; font-family:var(--mono) }
+.mk-hdr { font-size:10px; color:var(--muted); letter-spacing:.4px; margin-bottom:4px; text-transform:uppercase }
+.mk-row { display:flex; align-items:center; gap:8px; padding:2px 4px; font-size:10.5px; font-family:var(--mono); border-radius:3px }
+.mk-row.mk-in { background:rgba(38,166,154,.1) }
+.mk-mte { width:38px; text-align:right; font-weight:700 }
+.mk-tk { flex:1; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.mk-q { color:var(--text) }
 
 /* ── Captain ─────────────────────────────────────────────────────────── */
 #captain-card { min-height:180px }
@@ -381,11 +392,13 @@ tbody tr:hover td { background:var(--bg3) }
           <div class="conn-item"><span class="conn-led" id="led-cap"></span>Captain AI</div>
         </div>
         <div class="diag-row"><span class="kv-label">Captain engine</span><span id="diag-capsrc" class="neu">-</span></div>
+        <div id="diag-cap-hint" class="diag-hint" style="display:none"></div>
         <div class="diag-row"><span class="kv-label">Markets tracked</span><span id="diag-tracked" class="neu">-</span></div>
         <div class="diag-row"><span class="kv-label">In trade window</span><span id="diag-window" class="neu">-</span></div>
         <div class="diag-row"><span class="kv-label">Two-sided quotes</span><span id="diag-quoted" class="neu">-</span></div>
         <div class="diag-row"><span class="kv-label">Forecast ready</span><span id="diag-fc" class="neu">-</span></div>
         <div id="diag-why" class="diag-why" style="display:none"></div>
+        <div id="diag-markets" style="margin-top:8px"></div>
       </div>
     </div>
 
@@ -1045,12 +1058,33 @@ function renderDiagnostics(s) {
   setLed('led-cap', running ? capOk : null);
 
   // Captain engine label — THE answer to "is it talking to Gemini?"
+  // Uses the precise status_detail so we distinguish "no key" from "SDK missing".
   const capEl = document.getElementById('diag-capsrc');
+  const detail = (s.captain && s.captain.status_detail) || '';
   const src = d.captain_source || '-';
-  if (src === 'gemini') { capEl.textContent = 'Gemini (live)'; capEl.className = 'pos'; }
-  else if (src === 'heuristic') { capEl.textContent = 'Heuristic (no Gemini key)'; capEl.className = 'warn-c'; }
-  else if (src === 'default') { capEl.textContent = 'Default guardrails'; capEl.className = 'warn-c'; }
-  else { capEl.textContent = running ? 'starting...' : '-'; capEl.className = 'neu'; }
+  let capMsg = '', capCls = 'neu', capHint = '';
+  if (detail === 'live' || src === 'gemini') { capMsg = 'Gemini (live)'; capCls = 'pos'; }
+  else if (detail === 'sdk_missing') {
+    capMsg = 'SDK not installed'; capCls = 'neg';
+    capHint = 'Run: <b>pip install google-generativeai</b> then restart.';
+  }
+  else if (detail === 'no_api_key') {
+    capMsg = 'No Gemini key'; capCls = 'neg';
+    capHint = 'Add GEMINI_API_KEY to your .env, then restart.';
+  }
+  else if (detail.startsWith('init_failed')) {
+    capMsg = 'Init failed'; capCls = 'neg'; capHint = detail.replace('init_failed:', 'Error:');
+  }
+  else if (src === 'heuristic') { capMsg = 'Heuristic fallback'; capCls = 'warn-c'; }
+  else { capMsg = running ? 'starting...' : '-'; capCls = 'neu'; }
+  capEl.innerHTML = capMsg;
+  capEl.className = capCls;
+  // Surface the actionable hint just under the status grid.
+  const hintEl = document.getElementById('diag-cap-hint');
+  if (hintEl) {
+    hintEl.innerHTML = capHint;
+    hintEl.style.display = capHint ? '' : 'none';
+  }
 
   document.getElementById('diag-tracked').textContent = d.markets_tracked ?? 0;
   const win = d.markets_in_window ?? 0;
@@ -1103,6 +1137,28 @@ function renderDiagnostics(s) {
   }
   whyEl.innerHTML = why;
   whyEl.style.display = why ? '' : 'none';
+
+  // Discovered markets table — shows exactly what the engine sees, with each
+  // market's minutes-to-expiry so the "wait an hour" case is obvious.
+  const mkEl = document.getElementById('diag-markets');
+  const sample = d.market_sample || [];
+  if (running && sample.length) {
+    const rows = sample.map(m => {
+      const inWin = m.in_window;
+      const mteCol = inWin ? 'var(--green)' : m.mte != null && m.mte < 6 ? 'var(--muted)' : 'var(--text)';
+      const quote = (m.yes_bid != null && m.yes_ask != null)
+        ? `${m.yes_bid}/${m.yes_ask}¢` : '<span style="color:var(--dim)">no quote</span>';
+      const tk = (m.ticker || '').split('-').pop();
+      return `<div class="mk-row${inWin ? ' mk-in' : ''}">
+        <span class="mk-mte" style="color:${mteCol}">${m.mte != null ? m.mte + 'm' : '-'}</span>
+        <span class="mk-tk">${tk}</span>
+        <span class="mk-q">${quote}</span>
+      </div>`;
+    }).join('');
+    mkEl.innerHTML = `<div class="mk-hdr">Markets the engine sees (soonest expiry first)</div>${rows}`;
+  } else {
+    mkEl.innerHTML = '';
+  }
 }
 
 function setLed(id, state) {

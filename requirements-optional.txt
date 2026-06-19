@@ -1,0 +1,18 @@
+# =============================================================================
+#  OPTIONAL dependencies - TimesFM forecasting model (Google).
+#
+#  This pulls in PyTorch (~2 GB) and a ~500M parameter checkpoint on first run.
+#  It is NOT required: the bot ships with a statistical BaselineForecaster that
+#  runs fine in paper mode. Install this only if you want the full TimesFM
+#  foundation-model forecasts.
+#
+#  A failure to install anything in this file does NOT stop the bot - SETUP.bat
+#  treats it as best-effort.
+#
+#  Install manually with:
+#      .venv\Scripts\activate
+#      pip install -r requirements-optional.txt
+# =============================================================================
+
+pandas>=2.0.0
+timesfm[torch]>=1.2.0

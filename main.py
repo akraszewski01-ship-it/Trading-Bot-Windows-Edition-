@@ -73,6 +73,17 @@ async def captain_loop(config, captain: Captain, engine: ExecutionEngine) -> Non
         "source": "gemini" if captain.enabled else "heuristic",
         "status_detail": captain.status_detail,
     }})
+    # Fast real connectivity check so the dashboard reflects the TRUE Gemini
+    # status (e.g. invalid key) within seconds, not an optimistic "live".
+    if captain.enabled:
+        gemini_ok = await captain.probe()
+        BotState.update({"captain": {
+            "regime": "-", "kelly_mult": 0.0, "min_edge": 0.0, "halt": False,
+            "reasoning": "Gemini connected." if gemini_ok
+                         else "Gemini unreachable - running on the safety heuristic.",
+            "source": "gemini" if gemini_ok else "heuristic",
+            "status_detail": captain.status_detail,
+        }})
     await asyncio.sleep(15)
     while True:
         try:

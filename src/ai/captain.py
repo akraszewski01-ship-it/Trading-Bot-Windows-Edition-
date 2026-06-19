@@ -100,6 +100,7 @@ class Captain:
         self.enabled = bool(config.gemini_api_key)
         self.last_decision = CaptainDecision.conservative_default()
         self._model = None
+        self._consec_failures = 0
         # Precise human-readable status for the dashboard / logs.
         self.status_detail = "starting"
 
@@ -165,6 +166,27 @@ class Captain:
             log.warning("Captain: response_schema unsupported (%s); JSON-mode only", exc)
             return genai.GenerationConfig(**base)
 
+    # -------------------------------------------------------------------- probe
+    async def probe(self) -> bool:
+        """Quick liveness check against the real Gemini API so the dashboard can
+        show the *true* status within seconds of startup (not an optimistic
+        "live"). Returns True if Gemini answered. Never raises."""
+        if not self.enabled or self._model is None:
+            return False
+        try:
+            await asyncio.to_thread(self._model.generate_content, "ping")
+            self.status_detail = "live"
+            log.info("Captain: Gemini connectivity OK (model=%s).", self.config.gemini_model)
+            return True
+        except Exception as exc:
+            self.status_detail = f"review_failed: {_short_err(exc)}"
+            log.error(
+                "Captain: Gemini call FAILED (%s). Falling back to the heuristic. "
+                "Check that GEMINI_API_KEY is a valid AI Studio key (they start "
+                "with 'AIza') and the model name is correct.", _short_err(exc),
+            )
+            return False
+
     # ------------------------------------------------------------------- review
     async def review(self, context: Dict[str, Any]) -> CaptainDecision:
         """Run a Captain review; never raises (always returns a usable decision)."""
@@ -184,11 +206,22 @@ class Captain:
             data = json.loads(resp.text)
             decision = self._parse(data)
             self.last_decision = decision
+            self.status_detail = "live"
+            self._consec_failures = 0
             log.info("Captain %s", decision.summary())
             return decision
         except Exception as exc:
-            log.error("Captain review failed (%s) - reusing last decision", exc)
-            return self.last_decision
+            # Gemini unreachable / key invalid: surface it AND keep trading via
+            # the adaptive heuristic rather than freezing on a stale decision.
+            self._consec_failures += 1
+            self.status_detail = f"review_failed: {_short_err(exc)}"
+            log.error(
+                "Captain review failed (%s) [x%d] - using heuristic this cycle",
+                _short_err(exc), self._consec_failures,
+            )
+            decision = self._heuristic(context)
+            self.last_decision = decision
+            return decision
 
     # -------------------------------------------------------------- validation
     def _parse(self, data: Dict[str, Any]) -> CaptainDecision:
@@ -247,3 +280,9 @@ def _clamp(value: Any, lo: float, hi: float) -> float:
         return max(lo, min(hi, float(value)))
     except (TypeError, ValueError):
         return lo
+
+
+def _short_err(exc: Exception) -> str:
+    """A compact, dashboard-friendly one-liner for an exception."""
+    msg = " ".join(str(exc).split())
+    return msg[:180] if msg else exc.__class__.__name__

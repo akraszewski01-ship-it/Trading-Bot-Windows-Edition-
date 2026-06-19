@@ -143,6 +143,7 @@ class OrderBookManager:
         self._stop = False
         self._resubscribe = asyncio.Event()
         self._connected = False
+        self._mode = "ws"  # "ws" | "rest" — informational, for diagnostics
 
     # ------------------------------------------------------------------ public
     def set_tickers(self, tickers: Iterable[str]) -> None:
@@ -164,24 +165,99 @@ class OrderBookManager:
     def is_connected(self) -> bool:
         return self._connected
 
+    @property
+    def mode(self) -> str:
+        """'ws' (authenticated WebSocket) or 'rest' (public REST polling)."""
+        return self._mode
+
     def stop(self) -> None:
         self._stop = True
         self._resubscribe.set()
 
     # ------------------------------------------------------------------ run loop
     async def run(self) -> None:
+        # The Kalshi WS handshake requires valid signed auth. With no key it will
+        # always 401, so go straight to public REST polling (fine for paper).
+        if not self.client.is_authenticated:
+            log.info(
+                "Kalshi WS requires auth and no key is loaded -> using public "
+                "REST orderbook polling (paper mode)."
+            )
+            await self._rest_poll_loop()
+            return
+
         backoff = 1
+        ws_failures = 0
         while not self._stop:
             try:
                 await self._connect_and_listen()
+                ws_failures = 0
                 backoff = 1
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
                 self._connected = False
+                ws_failures += 1
+                detail = str(exc)
+                auth_reject = ("401" in detail or "403" in detail
+                               or "rejected" in detail.lower())
+                # A rejected/unauthorized handshake will not heal on retry, so
+                # fall back to public REST polling instead of looping on 401.
+                if auth_reject or ws_failures >= 3:
+                    log.warning(
+                        "Kalshi orderbook WS unavailable (%s) -> switching to "
+                        "public REST polling. (Live order placement still needs "
+                        "a working authenticated connection.)",
+                        detail,
+                    )
+                    await self._rest_poll_loop()
+                    return
                 log.error("Orderbook WS error: %s - reconnecting in %ss", exc, backoff)
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, 30)
+
+    # ----------------------------------------------------- REST polling fallback
+    async def _rest_poll_loop(self) -> None:
+        """Maintain books by polling the PUBLIC REST orderbook endpoint.
+
+        Used whenever the authenticated WebSocket is unavailable so paper
+        trading still has live books and the dashboard shows quotes. Honors
+        live ticker-set changes and is bounded by config to stay polite to the
+        public endpoint.
+        """
+        self._mode = "rest"
+        interval = max(0.5, float(getattr(self.config, "orderbook_rest_interval", 2.5)))
+        depth = int(getattr(self.config, "orderbook_rest_depth", 32))
+        cap = int(getattr(self.config, "orderbook_rest_max_markets", 40))
+        log.info(
+            "Orderbook: polling public REST every %.1fs (depth=%d, <=%d markets).",
+            interval, depth, cap,
+        )
+        while not self._stop:
+            self._resubscribe.clear()
+            tickers = sorted(self._tickers)[:cap]
+            if not tickers:
+                self._connected = True  # connected, just nothing to track yet
+                await asyncio.sleep(interval)
+                continue
+            ok = 0
+            # Fetch in small concurrent batches to be gentle on the endpoint.
+            for i in range(0, len(tickers), 8):
+                if self._stop:
+                    break
+                batch = tickers[i:i + 8]
+                results = await asyncio.gather(
+                    *(self.client.get_orderbook(t, depth=depth) for t in batch),
+                    return_exceptions=True,
+                )
+                for tk, res in zip(batch, results):
+                    if isinstance(res, Exception) or not isinstance(res, dict):
+                        continue
+                    book = self._books.setdefault(tk, OrderBook(ticker=tk))
+                    book.apply_snapshot(res.get("yes"), res.get("no"), book.seq + 1)
+                    ok += 1
+            self._connected = ok > 0
+            await asyncio.sleep(interval)
 
     async def _connect_and_listen(self) -> None:
         url = self.config.kalshi_ws_url

@@ -293,6 +293,7 @@ class ExecutionEngine:
         return {
             "kalshi_authenticated": self.client.is_authenticated,
             "orderbook_connected": self.orderbook.is_connected,
+            "orderbook_mode": self.orderbook.mode,
             "spot_connected": self.feed.is_connected,
             "captain_source": self._captain.source,
             "captain_regime": self._captain.market_regime,

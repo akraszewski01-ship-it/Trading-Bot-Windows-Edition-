@@ -205,23 +205,62 @@ class BaselineForecaster:
 # --------------------------------------------------------------------------- #
 #  Factory
 # --------------------------------------------------------------------------- #
+# The exact API this wrapper is written against. Newer/older ``timesfm`` releases
+# (e.g. the 2.5 line) rename these, which would otherwise blow up at runtime with
+# "module 'timesfm' has no attribute 'TimesFm'". We probe up-front and fall back.
+_REQUIRED_TIMESFM_ATTRS = ("TimesFm", "TimesFmHparams", "TimesFmCheckpoint")
+
+
+def _timesfm_api_ok() -> tuple:
+    """Return (importable, compatible, detail). Never raises."""
+    try:
+        import timesfm  # noqa: F401
+    except Exception as exc:  # not installed / broken install
+        return False, False, str(exc)
+    missing = [a for a in _REQUIRED_TIMESFM_ATTRS if not hasattr(timesfm, a)]
+    if missing:
+        ver = getattr(timesfm, "__version__", "?")
+        return True, False, f"installed v{ver} but missing {missing} (incompatible API)"
+    return True, True, "compatible"
+
+
 def create_predictor(config: Config, force_baseline: bool = False):
     """
     Return a forecaster exposing ``forecast(series) -> Forecast``.
 
-    Prefers TimesFM; falls back to :class:`BaselineForecaster` if the package is
-    not importable. (Checkpoint download still happens lazily on first forecast.)
-    """
-    if force_baseline:
-        log.warning("Forecaster: BaselineForecaster (forced)")
-        return BaselineForecaster(config)
-    try:
-        import timesfm  # noqa: F401  (probe availability)
+    The built-in :class:`BaselineForecaster` is always a safe choice. TimesFM is
+    used only when the installed package exposes the exact API this wrapper
+    targets, so an incompatible version can never crash the forecast loop.
 
-        log.info("Forecaster: TimesFM available")
-        return TimesFMPredictor(config)
-    except Exception as exc:
-        log.warning(
-            "Forecaster: TimesFM unavailable (%s) - using BaselineForecaster", exc
-        )
+    Controlled by ``config.forecaster``: ``auto`` (default), ``baseline`` or
+    ``timesfm``.
+    """
+    mode = (getattr(config, "forecaster", "auto") or "auto").lower()
+
+    if force_baseline or mode == "baseline":
+        log.info("Forecaster: BaselineForecaster (statistical GBM)%s",
+                 " [forced]" if force_baseline else " [FORECASTER=baseline]")
         return BaselineForecaster(config)
+
+    importable, compatible, detail = _timesfm_api_ok()
+    if compatible:
+        log.info("Forecaster: TimesFM (%s)", detail)
+        return TimesFMPredictor(config)
+
+    # Incompatible or unavailable -> baseline. Be loud once so it is obvious in
+    # the log why we are not on TimesFM (no per-minute error spam).
+    if mode == "timesfm":
+        log.error(
+            "FORECASTER=timesfm but TimesFM is unusable (%s). Falling back to "
+            "BaselineForecaster. Install a compatible build with "
+            "'pip install -r requirements-optional.txt' or set FORECASTER=baseline.",
+            detail,
+        )
+    elif importable:
+        log.warning(
+            "TimesFM %s - using BaselineForecaster instead. "
+            "(Set FORECASTER=baseline in .env to silence this.)", detail,
+        )
+    else:
+        log.info("TimesFM not installed - using BaselineForecaster (%s).", detail)
+    return BaselineForecaster(config)

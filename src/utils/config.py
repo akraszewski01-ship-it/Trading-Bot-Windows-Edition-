@@ -61,6 +61,12 @@ class Config:
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.0-flash"
 
+    # --- Forecaster ----------------------------------------------------------
+    # "auto"     -> use TimesFM only if installed AND its API matches; else baseline
+    # "baseline" -> always use the built-in statistical forecaster (no heavy deps)
+    # "timesfm"  -> force TimesFM (falls back to baseline if it cannot load)
+    forecaster: str = "auto"
+
     # --- TimesFM -------------------------------------------------------------
     timesfm_backend: str = "cpu"
     timesfm_repo_id: str = "google/timesfm-2.0-500m-pytorch"
@@ -75,6 +81,14 @@ class Config:
 
     # --- Spot feed -----------------------------------------------------------
     spot_provider: str = "coinbase"  # "coinbase" | "binance"
+
+    # --- Orderbook (WebSocket primary, public REST polling fallback) ----------
+    # The Kalshi WS handshake needs valid signed auth. When that is unavailable
+    # (no key, or a 401), the engine polls the PUBLIC REST orderbook instead so
+    # paper trading still gets live books. These bound that polling.
+    orderbook_rest_interval: float = 2.5  # seconds between REST poll cycles
+    orderbook_rest_depth: int = 32        # price levels fetched per market
+    orderbook_rest_max_markets: int = 40  # cap markets polled per cycle
 
     # --- Markets -------------------------------------------------------------
     market_series: List[str] = field(default_factory=lambda: ["KXBTC15M", "KXETH15M"])
@@ -152,11 +166,15 @@ def load_config() -> Config:
         kalshi_api_host=_get("KALSHI_API_HOST", "https://api.elections.kalshi.com"),
         gemini_api_key=_get("GEMINI_API_KEY"),
         gemini_model=_get("GEMINI_MODEL", "gemini-2.0-flash"),
+        forecaster=_get("FORECASTER", "auto").lower(),
         timesfm_backend=_get("TIMESFM_BACKEND", "cpu").lower(),
         timesfm_repo_id=_get("TIMESFM_REPO_ID", "google/timesfm-2.0-500m-pytorch"),
         min_history_bars=_get_int("MIN_HISTORY_BARS", 1),
         baseline_default_vol=_get_float("BASELINE_DEFAULT_VOL", 0.0012),
         spot_provider=_get("SPOT_PROVIDER", "coinbase").lower(),
+        orderbook_rest_interval=_get_float("ORDERBOOK_REST_INTERVAL", 2.5),
+        orderbook_rest_depth=_get_int("ORDERBOOK_REST_DEPTH", 32),
+        orderbook_rest_max_markets=_get_int("ORDERBOOK_REST_MAX_MARKETS", 40),
         market_series=series,
         # Wider default window (0-13 min) so the bot evaluates markets across
         # most of their life and trades actively in paper mode. Narrow it via

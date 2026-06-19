@@ -461,6 +461,7 @@ tbody tr:hover td{background:var(--card2)}
       </div>
       <div class="cap-hint" id="diag-cap-hint" style="display:none"></div>
       <div class="kv"><span class="k">Captain engine</span><span class="v" id="diag-capsrc">--</span></div>
+      <div class="kv"><span class="k">Order book feed</span><span class="v" id="diag-obmode">--</span></div>
       <div class="kv"><span class="k">Markets tracked</span><span class="v" id="diag-tracked">--</span></div>
       <div class="kv"><span class="k">In trade window</span><span class="v" id="diag-window">--</span></div>
       <div class="kv"><span class="k">Two-sided quotes</span><span class="v" id="diag-quoted">--</span></div>
@@ -975,15 +976,24 @@ function renderDiagnostics(s){
   const capEl=document.getElementById('diag-capsrc');
   const detail=(s.captain&&s.captain.status_detail)||'',src=d.captain_source||'-';
   let msg='',cls='',hint='';
-  if(detail==='live'||src==='gemini'){msg='Gemini (live)';cls='var(--teal)';}
+  if(detail==='live'){msg='Gemini (live)';cls='var(--teal)';}
+  else if(detail.startsWith('review_failed')){msg='Gemini call failed';cls='var(--red)';
+    hint=detail.replace('review_failed:','Error:')+' &mdash; check <b>GEMINI_API_KEY</b> (AI Studio keys start with AIza). Running on the safety heuristic meanwhile.';}
   else if(detail==='sdk_missing'){msg='SDK not installed';cls='var(--red)';hint='Run: <b>pip install google-generativeai</b> then restart.';}
   else if(detail==='no_api_key'){msg='No Gemini key';cls='var(--red)';hint='Add GEMINI_API_KEY to .env, then restart.';}
   else if(detail.startsWith('init_failed')){msg='Init failed';cls='var(--red)';hint=detail.replace('init_failed:','Error:');}
+  else if(src==='gemini'){msg='Gemini (live)';cls='var(--teal)';}
   else if(src==='heuristic'){msg='Heuristic fallback';cls='var(--yellow)';}
   else{msg=running?'starting...':'--';cls='var(--muted)';}
   capEl.textContent=msg;capEl.style.color=cls;
   const hintEl=document.getElementById('diag-cap-hint');
   hintEl.innerHTML=hint;hintEl.style.display=hint?'':'none';
+
+  const obEl=document.getElementById('diag-obmode'),obm=d.orderbook_mode||'';
+  if(!running){obEl.textContent='--';obEl.style.color='var(--muted)';}
+  else if(obm==='rest'){obEl.textContent='REST polling (public)';obEl.style.color='var(--yellow)';}
+  else if(obm==='ws'&&d.orderbook_connected){obEl.textContent='WebSocket (live)';obEl.style.color='var(--teal)';}
+  else{obEl.textContent='connecting...';obEl.style.color='var(--muted)';}
 
   document.getElementById('diag-tracked').textContent=d.markets_tracked||0;
   const win=d.markets_in_window||0,winEl=document.getElementById('diag-window');

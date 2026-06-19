@@ -175,6 +175,9 @@ class ExecutionEngine:
         self._captain: CaptainDecision = CaptainDecision.conservative_default()
         self._open: Dict[str, OpenPosition] = {}
         self._settled: set[str] = set()
+        # Live diagnostics for the dashboard (why no trade is firing, etc.).
+        self._last_eval: Dict[str, str] = {}
+        self._markets_in_window: int = 0
 
     # ----------------------------------------------------------- shared updates
     def update_forecast(self, series: str, forecast: Forecast) -> None:
@@ -214,10 +217,14 @@ class ExecutionEngine:
         """Apply the timing gate + spread-crossing logic across all markets."""
         decisions: List[TradeDecision] = []
         now = datetime.now(timezone.utc)
+        self._last_eval = {}
+        in_window = 0
 
         allowed, why = self.risk.can_trade()
         if not allowed:
             log.debug("Risk gate closed: %s", why)
+            self._last_eval["_risk_gate"] = f"trading halted: {why}"
+            self._markets_in_window = 0
             return decisions
 
         for ticker, spec in list(self._specs.items()):
@@ -229,15 +236,54 @@ class ExecutionEngine:
             # --- Timing gate ----------------------------------------------------
             if not (self.config.trade_window_min <= mte <= self.config.trade_window_max):
                 continue
+            in_window += 1
 
             decision = self._evaluate_market(spec, mte)
             if decision is None:
                 continue
+            self._last_eval[ticker] = decision.reason
             decisions.append(decision)
             if decision.side and decision.contracts > 0 and not decision.executed:
                 await self._execute(spec, decision)
 
+        self._markets_in_window = in_window
         return decisions
+
+    # ------------------------------------------------------------- diagnostics
+    def diagnostics(self) -> dict:
+        """Live snapshot of the pipeline for the dashboard's system-status panel."""
+        now = datetime.now(timezone.utc)
+        # Count markets per series and the soonest expiry in each.
+        per_series: Dict[str, dict] = {}
+        for spec in self._specs.values():
+            d = per_series.setdefault(spec.series, {"count": 0, "next_expiry_min": None})
+            d["count"] += 1
+            mte = spec.minutes_to_expiry(now)
+            if mte is not None and mte > 0:
+                cur = d["next_expiry_min"]
+                if cur is None or mte < cur:
+                    d["next_expiry_min"] = round(mte, 1)
+
+        quoted = 0
+        for ticker in self._specs:
+            q = self.orderbook.get_quote(ticker)
+            if q and q.is_two_sided:
+                quoted += 1
+
+        return {
+            "kalshi_authenticated": self.client.is_authenticated,
+            "orderbook_connected": self.orderbook.is_connected,
+            "spot_connected": self.feed.is_connected,
+            "captain_source": self._captain.source,
+            "captain_regime": self._captain.market_regime,
+            "markets_tracked": len(self._specs),
+            "markets_in_window": self._markets_in_window,
+            "markets_quoted": quoted,
+            "forecasts_ready": sorted(self._forecasts.keys()),
+            "per_series": per_series,
+            "trade_window": [self.config.trade_window_min, self.config.trade_window_max],
+            "skip_reasons": dict(list(self._last_eval.items())[:12]),
+        }
 
     def _evaluate_market(self, spec: MarketSpec, mte: float) -> Optional[TradeDecision]:
         d = TradeDecision(ticker=spec.ticker, series=spec.series, minutes_to_expiry=mte)

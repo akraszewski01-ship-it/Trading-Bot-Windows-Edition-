@@ -24,6 +24,18 @@ class BotState:
         "spot": {},
         "recent_decisions": [],
         "circuit_breaker": {"halted": False, "reason": ""},
+        "diagnostics": {
+            "kalshi_authenticated": False,
+            "orderbook_connected": False,
+            "spot_connected": False,
+            "captain_source": "-",
+            "markets_tracked": 0,
+            "markets_in_window": 0,
+            "markets_quoted": 0,
+            "forecasts_ready": [],
+            "per_series": {},
+            "skip_reasons": {},
+        },
     }
     _log_lines: List[str] = []
     _max_log = 500

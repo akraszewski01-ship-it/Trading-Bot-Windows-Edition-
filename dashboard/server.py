@@ -142,10 +142,9 @@ async def kalshi_market(series: str):
 
     try:
         async with httpx.AsyncClient(timeout=6.0) as client:
-            # Fetch the most recently expiring open market for this series
             r = await client.get(
                 f"{KALSHI_API}/markets",
-                params={"series_ticker": series, "status": "open", "limit": 5},
+                params={"series_ticker": series, "status": "open", "limit": 20},
             )
             if r.status_code != 200:
                 return {"error": f"Kalshi API {r.status_code}", "markets": []}
@@ -154,8 +153,24 @@ async def kalshi_market(series: str):
             if not markets:
                 return {"series": series, "markets": [], "orderbook": None, "trades": []}
 
-            # Pick the market expiring soonest (first in list from Kalshi)
-            market = markets[0]
+            # Pick the soonest-expiring open market still in the future — that is
+            # the contract people are actively betting on right now.
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc)
+
+            def _exp(m):
+                try:
+                    return datetime.fromisoformat((m.get("expiration_time") or "").replace("Z", "+00:00"))
+                except (ValueError, AttributeError):
+                    return None
+
+            future = [(m, _exp(m)) for m in markets]
+            future = [(m, e) for m, e in future if e is not None and e > now]
+            if future:
+                future.sort(key=lambda pair: pair[1])
+                market = future[0][0]
+            else:
+                market = markets[0]
             ticker = market["ticker"]
 
             # Fetch orderbook and recent trades in parallel

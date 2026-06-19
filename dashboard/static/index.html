@@ -147,6 +147,21 @@ button { cursor:pointer; font-family:var(--ui) }
 }
 .card-body { flex:1; overflow:auto; padding:10px 12px }
 
+/* ── System status ───────────────────────────────────────────────────── */
+.conn-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px 8px; margin-bottom:10px }
+.conn-item { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text) }
+.conn-led { width:8px; height:8px; border-radius:50%; background:var(--dim); flex-shrink:0; transition:background .3s, box-shadow .3s }
+.conn-led.on  { background:var(--green); box-shadow:0 0 6px var(--green) }
+.conn-led.off { background:var(--red) }
+.conn-led.idle{ background:var(--yellow) }
+.diag-row { display:flex; justify-content:space-between; padding:3px 0; font-size:11px; border-bottom:1px solid var(--border) }
+.diag-row:last-of-type { border-bottom:none }
+.diag-why {
+  margin-top:8px; padding:7px 9px; border-radius:5px; font-size:10.5px; line-height:1.5;
+  background:rgba(246,201,14,.07); border:1px solid rgba(246,201,14,.25); color:var(--yellow);
+}
+.diag-why b { color:var(--text) }
+
 /* ── Captain ─────────────────────────────────────────────────────────── */
 #captain-card { min-height:180px }
 .regime-box {
@@ -354,6 +369,25 @@ tbody tr:hover td { background:var(--bg3) }
 
   <!-- LEFT SIDEBAR -->
   <div id="left-panel">
+
+    <!-- System Status -->
+    <div class="card" id="status-card">
+      <div class="card-hdr">System Status</div>
+      <div class="card-body" style="padding:8px 12px">
+        <div class="conn-grid">
+          <div class="conn-item"><span class="conn-led" id="led-spot"></span>Spot feed</div>
+          <div class="conn-item"><span class="conn-led" id="led-ob"></span>Kalshi book</div>
+          <div class="conn-item"><span class="conn-led" id="led-auth"></span>Kalshi auth</div>
+          <div class="conn-item"><span class="conn-led" id="led-cap"></span>Captain AI</div>
+        </div>
+        <div class="diag-row"><span class="kv-label">Captain engine</span><span id="diag-capsrc" class="neu">-</span></div>
+        <div class="diag-row"><span class="kv-label">Markets tracked</span><span id="diag-tracked" class="neu">-</span></div>
+        <div class="diag-row"><span class="kv-label">In trade window</span><span id="diag-window" class="neu">-</span></div>
+        <div class="diag-row"><span class="kv-label">Two-sided quotes</span><span id="diag-quoted" class="neu">-</span></div>
+        <div class="diag-row"><span class="kv-label">Forecast ready</span><span id="diag-fc" class="neu">-</span></div>
+        <div id="diag-why" class="diag-why" style="display:none"></div>
+      </div>
+    </div>
 
     <!-- Captain -->
     <div class="card" id="captain-card">
@@ -702,13 +736,17 @@ function pushKalshiPoint(series, yesPrice) {
 //  Kalshi market polling
 // ════════════════════════════════════════════════════════════════
 async function fetchKalshiMarket(series) {
+  const metaEl = document.getElementById(`kp-meta-${series}`);
   try {
     const r = await fetch(`/api/kalshi/${series}`);
-    if (!r.ok) return;
+    if (!r.ok) { if (metaEl) metaEl.textContent = `proxy error ${r.status}`; return; }
     const d = await r.json();
-    if (d.error || !d.market) return;
+    if (d.error) { if (metaEl) metaEl.textContent = 'Kalshi unreachable'; return; }
+    if (!d.market) { if (metaEl) metaEl.textContent = 'no open market'; return; }
     renderKalshiPanel(series, d);
-  } catch (_) {}
+  } catch (e) {
+    if (metaEl) metaEl.textContent = 'connection error';
+  }
 }
 
 function renderKalshiPanel(series, data) {
@@ -991,7 +1029,86 @@ function renderState(s) {
     tbody.innerHTML = '<tr><td colspan="7" class="empty">No decisions yet</td></tr>';
   }
 
+  renderDiagnostics(s);
   refreshSpotChart(s);
+}
+
+function renderDiagnostics(s) {
+  const d = s.diagnostics || {};
+  const running = (s.status === 'running');
+
+  // LEDs — when stopped, everything is grey (idle handled by absence of class)
+  setLed('led-spot', running ? d.spot_connected : null);
+  setLed('led-ob',   running ? d.orderbook_connected : null);
+  setLed('led-auth', d.kalshi_authenticated);  // auth is config, valid even when stopped
+  const capOk = d.captain_source && d.captain_source !== '-' && d.captain_source !== 'default';
+  setLed('led-cap', running ? capOk : null);
+
+  // Captain engine label — THE answer to "is it talking to Gemini?"
+  const capEl = document.getElementById('diag-capsrc');
+  const src = d.captain_source || '-';
+  if (src === 'gemini') { capEl.textContent = 'Gemini (live)'; capEl.className = 'pos'; }
+  else if (src === 'heuristic') { capEl.textContent = 'Heuristic (no Gemini key)'; capEl.className = 'warn-c'; }
+  else if (src === 'default') { capEl.textContent = 'Default guardrails'; capEl.className = 'warn-c'; }
+  else { capEl.textContent = running ? 'starting...' : '-'; capEl.className = 'neu'; }
+
+  document.getElementById('diag-tracked').textContent = d.markets_tracked ?? 0;
+  const win = d.markets_in_window ?? 0;
+  const winEl = document.getElementById('diag-window');
+  winEl.textContent = win;
+  winEl.className = win > 0 ? 'pos' : 'neu';
+  const quoted = d.markets_quoted ?? 0;
+  const qEl = document.getElementById('diag-quoted');
+  qEl.textContent = quoted;
+  qEl.className = quoted > 0 ? 'pos' : 'neu';
+  const fc = d.forecasts_ready || [];
+  const fcEl = document.getElementById('diag-fc');
+  fcEl.textContent = fc.length ? fc.map(x => x.replace('KX','').replace('15M','')).join(', ') : 'none yet';
+  fcEl.className = fc.length ? 'pos' : 'warn-c';
+
+  // "Why no trade?" explainer — reads the live pipeline and tells the user
+  // exactly what stage is blocking, so the bot never looks dead.
+  const whyEl = document.getElementById('diag-why');
+  let why = '';
+  if (!running) {
+    why = '<b>Engine stopped.</b> Press Start to begin trading.';
+  } else if (!d.spot_connected) {
+    why = '<b>Waiting for spot feed.</b> Connecting to Coinbase for BTC/ETH prices...';
+  } else if (!d.forecasts_ready || !d.forecasts_ready.length) {
+    why = '<b>Building forecast.</b> Need ~64 minutes of price history before the model can predict.';
+  } else if (!d.orderbook_connected) {
+    why = '<b>Connecting to Kalshi order book...</b>';
+  } else if ((d.markets_in_window ?? 0) === 0) {
+    const ps = d.per_series || {};
+    const nexts = Object.values(ps).map(v => v.next_expiry_min).filter(x => x != null);
+    const soonest = nexts.length ? Math.min(...nexts) : null;
+    const w = d.trade_window || [6, 9];
+    why = `<b>No market in the trade window yet.</b> The bot only trades ${w[0]}-${w[1]} min before a market expires.` +
+          (soonest != null ? ` Next expiry: ${soonest.toFixed(1)} min.` : '');
+  } else if ((d.markets_quoted ?? 0) === 0) {
+    why = '<b>Markets in window but no live quotes.</b> Waiting for order-book data from Kalshi.';
+  } else {
+    // In-window AND quoted — show the actual per-market skip reasons.
+    const reasons = d.skip_reasons || {};
+    const keys = Object.keys(reasons);
+    if (keys.length) {
+      const items = keys.slice(0, 4).map(k => {
+        const sym = k.replace('_risk_gate','RISK GATE');
+        return `<div style="margin-top:3px">${sym.includes('RISK')?'':'<span style=\"color:var(--cyan)\">'+k.split('-').pop()+'</span> '}${reasons[k]}</div>`;
+      }).join('');
+      why = `<b>Evaluating ${keys.length} market(s) — no edge yet:</b>${items}`;
+    } else {
+      why = '<b>Scanning for edges...</b> Markets are quoted; waiting for model edge to beat the spread.';
+    }
+  }
+  whyEl.innerHTML = why;
+  whyEl.style.display = why ? '' : 'none';
+}
+
+function setLed(id, state) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'conn-led' + (state === true ? ' on' : state === false ? ' off' : '');
 }
 
 function setStripVal(id, txt, cls) {

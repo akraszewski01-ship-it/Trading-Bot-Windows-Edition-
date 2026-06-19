@@ -141,6 +141,7 @@ async def trading_loop(engine: ExecutionEngine, interval: int = 5) -> None:
             BotState.update({
                 "status": "running",
                 "portfolio": snap,
+                "diagnostics": engine.diagnostics(),
                 "circuit_breaker": {"halted": snap.get("halted", False), "reason": ""},
                 "positions": [
                     {

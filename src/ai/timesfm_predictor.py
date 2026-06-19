@@ -168,17 +168,25 @@ class BaselineForecaster:
 
     def forecast(self, series: Sequence[float]) -> Forecast:
         s = [float(x) for x in series if x and x > 0]
+        if not s:
+            # No price at all yet - return a flat, wide forecast so callers never
+            # crash. (In practice the feed always supplies the current price.)
+            raise ValueError("no spot price available for forecast")
         last = s[-1]
         horizon = self.config.horizon_len
+        default_vol = max(1e-6, float(getattr(self.config, "baseline_default_vol", 0.0012)))
 
-        # Per-minute log-return drift (mu) and volatility (sigma).
+        # Per-minute log-return drift (mu) and volatility (sigma). With little or
+        # no history we fall back to a calibrated default vol so the bot can
+        # forecast immediately - no price-history warm-up required.
         rets = [math.log(s[i] / s[i - 1]) for i in range(1, len(s))]
-        if len(rets) >= 2:
+        if len(rets) >= 3:
             mu = sum(rets) / len(rets)
             var = sum((r - mu) ** 2 for r in rets) / (len(rets) - 1)
-            sigma = math.sqrt(var)
+            sigma = max(math.sqrt(var), default_vol * 0.25)
         else:
-            mu, sigma = 0.0, 1e-4
+            # 0-2 returns: no reliable estimate -> assume zero drift, default vol.
+            mu, sigma = 0.0, default_vol
 
         point, q10, q90 = [], [], []
         log_last = math.log(last)

@@ -827,7 +827,7 @@ function renderDiagnostics(s){
   let why='';
   if(!running) why='<b>Engine stopped.</b> Press Start to begin trading.';
   else if(!d.spot_connected) why='<b>Waiting for spot feed.</b> Connecting to Coinbase...';
-  else if(!fc.length) why='<b>Building forecast.</b> Needs ~64 minutes of price history.';
+  else if(!fc.length) why='<b>Getting first price tick...</b> Forecast starts as soon as the spot feed sends one price (seconds).';
   else if(!d.orderbook_connected) why='<b>Connecting to Kalshi order book...</b>';
   else if(win===0){
     const ps=d.per_series||{},nx=Object.values(ps).map(v=>v.next_expiry_min).filter(x=>x!=null);

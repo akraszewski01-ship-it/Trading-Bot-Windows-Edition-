@@ -56,18 +56,37 @@ class MarketDataFeed:
         # Coinbase tick->minute aggregation state.
         self._cur_minute: Dict[str, int] = {}
         self._last_px: Dict[str, float] = {}
+        # Latest live price seen on ANY message (before a 1-min bar closes), so
+        # the forecaster can run from the current price with no history warm-up.
+        self._live_px: Dict[str, float] = {}
         self._stop = False
         self._connected = False
 
     # ------------------------------------------------------------------ access
     def get_window(self, symbol: str) -> List[float]:
-        return list(self._windows.get(symbol, ()))
+        win = list(self._windows.get(symbol, ()))
+        if win:
+            return win
+        # No closed bars yet - hand back the current live price so the baseline
+        # forecaster can still produce a forecast (it assumes a default vol).
+        live = self._live_px.get(symbol)
+        return [live] if live is not None else []
 
     def latest(self, symbol: str) -> Optional[float]:
         win = self._windows.get(symbol)
-        return win[-1] if win else None
+        if win:
+            return win[-1]
+        return self._live_px.get(symbol)
 
-    def ready(self, symbol: str, minimum: int = 64) -> bool:
+    def ready(self, symbol: str, minimum: Optional[int] = None) -> bool:
+        """Ready to forecast. With ``min_history_bars<=1`` (default) a single
+        live price is enough - no price-history warm-up required."""
+        if minimum is None:
+            minimum = getattr(self.config, "min_history_bars", 1)
+        if len(self._windows.get(symbol, ())) >= max(minimum, 1) and minimum > 1:
+            return True
+        if minimum <= 1:
+            return self.latest(symbol) is not None
         return len(self._windows.get(symbol, ())) >= minimum
 
     @property
@@ -169,9 +188,12 @@ class MarketDataFeed:
                 msg = json.loads(raw)
                 data = msg.get("data", msg)
                 kline = data.get("k", {})
+                symbol = kline.get("s")
+                close = kline.get("c")
+                if symbol and close:
+                    self._live_px[symbol] = float(close)  # live, pre-close price
                 if kline.get("x"):  # candle closed
-                    symbol = kline.get("s")
-                    self._append(symbol, float(kline.get("c")))
+                    self._append(symbol, float(close))
 
     # ---------------------------------------------------------- coinbase listen
     async def _listen_coinbase(self) -> None:
@@ -196,6 +218,8 @@ class MarketDataFeed:
         """Fold a raw tick into one-minute close bars."""
         if symbol not in self._windows:
             return
+        if price > 0:
+            self._live_px[symbol] = price  # immediate price, no warm-up needed
         minute = int(time.time() // 60)
         prev = self._cur_minute.get(symbol)
         if prev is None:

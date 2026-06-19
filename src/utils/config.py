@@ -67,6 +67,12 @@ class Config:
     context_len: int = 512  # rolling minutes of spot history
     horizon_len: int = 15  # forecast horizon (minutes)
 
+    # Minimum spot bars before the baseline forecaster trusts measured vol.
+    # Below this it uses ``baseline_default_vol`` so the bot can forecast (and
+    # trade) immediately, with no price-history warm-up.
+    min_history_bars: int = 1
+    baseline_default_vol: float = 0.0012  # per-minute log-return stdev (~crypto)
+
     # --- Spot feed -----------------------------------------------------------
     spot_provider: str = "coinbase"  # "coinbase" | "binance"
 
@@ -148,6 +154,8 @@ def load_config() -> Config:
         gemini_model=_get("GEMINI_MODEL", "gemini-2.0-flash"),
         timesfm_backend=_get("TIMESFM_BACKEND", "cpu").lower(),
         timesfm_repo_id=_get("TIMESFM_REPO_ID", "google/timesfm-2.0-500m-pytorch"),
+        min_history_bars=_get_int("MIN_HISTORY_BARS", 1),
+        baseline_default_vol=_get_float("BASELINE_DEFAULT_VOL", 0.0012),
         spot_provider=_get("SPOT_PROVIDER", "coinbase").lower(),
         market_series=series,
         # Wider default window (0-13 min) so the bot evaluates markets across

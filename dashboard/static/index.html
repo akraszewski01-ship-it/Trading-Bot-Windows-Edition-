@@ -213,25 +213,66 @@ button{cursor:pointer;font-family:var(--ui)}
 
 /* Kalshi market panels */
 .mkt-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
-@media(max-width:1100px){.mkt-grid{grid-template-columns:1fr}}
+@media(max-width:1280px){.mkt-grid{grid-template-columns:1fr}}
 .mkt-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
-.mkt-yes{margin-left:auto;text-align:right}
-.mkt-yes .p{font-size:26px;font-weight:750;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
-.mkt-yes .l{font-size:10px;color:var(--muted)}
-.ring{width:44px;height:44px;position:relative;flex-shrink:0}
+.mkt-title{font-weight:700;font-size:14px;display:flex;align-items:center;gap:7px}
+.mkt-tk{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--teal);box-shadow:0 0 0 0 rgba(47,224,176,.5);animation:live 1.8s infinite}
+@keyframes live{0%{box-shadow:0 0 0 0 rgba(47,224,176,.5)}70%{box-shadow:0 0 0 7px rgba(47,224,176,0)}100%{box-shadow:0 0 0 0 rgba(47,224,176,0)}}
+.ring{width:44px;height:44px;position:relative;flex-shrink:0;margin-left:auto}
 .ring svg{transform:rotate(-90deg)}
 .ring-bg{fill:none;stroke:var(--card3);stroke-width:4}
 .ring-fg{fill:none;stroke-width:4;stroke-linecap:round;transition:.5s}
 .ring-txt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
-.mkt-body{display:flex;gap:14px}
-.mkt-chart{flex:1;position:relative;height:150px;min-width:0}
-.mkt-ob{width:150px;flex-shrink:0}
+
+/* price strip */
+.px-strip{display:flex;gap:8px;margin-bottom:14px}
+.px-cell{flex:1;background:var(--card2);border-radius:11px;padding:9px 11px;display:flex;flex-direction:column;gap:2px;border:1px solid transparent}
+.px-cell.yes{border-color:rgba(47,224,176,.3)}
+.px-cell.no{border-color:rgba(251,113,133,.3)}
+.px-lbl{font-size:9px;letter-spacing:.6px;color:var(--muted);font-weight:700}
+.px-val{font-size:21px;font-weight:750;font-variant-numeric:tabular-nums;letter-spacing:-.5px;line-height:1}
+.px-cell.yes .px-val{color:var(--teal)}
+.px-cell.no .px-val{color:var(--red)}
+.px-val2{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+.px-sub{font-size:9.5px;color:var(--muted);font-family:var(--mono)}
+
+/* chart view tabs */
+.mkt-tabs{display:flex;gap:5px;align-items:center;margin-bottom:12px}
+.mkt-tab{padding:5px 12px;border:1px solid var(--border2);background:var(--card2);color:var(--muted);font-size:11.5px;font-weight:600;border-radius:9px;transition:.15s}
+.mkt-tab.active{background:var(--card3);color:var(--text);border-color:var(--border2)}
+.mkt-tab .meta{font-size:10px;color:var(--muted)}
+
+.mkt-body2{display:flex;gap:14px}
+.mkt-chart2{flex:1;position:relative;height:190px;min-width:0}
+.mkt-chart2 canvas{position:absolute;inset:0}
+.mkt-side{width:172px;flex-shrink:0;display:flex;flex-direction:column;gap:12px}
+
+/* buy-in calculator */
+.buyin{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:12px}
+.buyin-hdr{font-size:10px;letter-spacing:.6px;color:var(--muted);font-weight:700;margin-bottom:10px}
+.buyin-side{display:flex;gap:5px;margin-bottom:10px}
+.bi-btn{flex:1;padding:6px;border:1px solid var(--border2);background:var(--card);color:var(--muted);font-size:11.5px;font-weight:700;border-radius:8px;transition:.15s}
+.bi-btn.active[data-s="yes"]{background:var(--teal-soft);color:var(--teal);border-color:rgba(47,224,176,.5)}
+.bi-btn.active[data-s="no"]{background:var(--red-soft);color:var(--red);border-color:rgba(251,113,133,.5)}
+.buyin-qty{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.buyin-qty label{font-size:11px;color:var(--muted)}
+.buyin-qty input{flex:1;width:100%;padding:6px 9px;background:var(--bg);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:12px}
+.buyin-qty input:focus{outline:none;border-color:var(--purple)}
+.bi-row{display:flex;justify-content:space-between;font-size:11.5px;padding:4px 0;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums}
+.bi-row:last-child{border-bottom:none}
+.bi-row span:first-child{color:var(--muted)}
+.bi-row span:last-child{font-weight:700;font-family:var(--mono)}
+.bi-row.profit span:last-child{color:var(--teal)}
+
+/* order book / depth side */
 .ob-side-lbl{font-size:9px;letter-spacing:.5px;padding:3px 0;font-weight:700}
 .ob-row{display:flex;align-items:center;gap:5px;padding:1.5px 0;font-size:10.5px;font-family:var(--mono)}
 .ob-bar{height:9px;border-radius:3px;transition:width .3s}
 .ob-price{width:26px;text-align:right}
 .ob-size{width:30px;text-align:right;color:var(--muted)}
-.trade-row{display:flex;gap:5px;padding:2px 0;font-size:10px;font-family:var(--mono)}
+.trades-box{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:10px 12px;flex:1;min-height:0;overflow:auto}
+.trade-row{display:flex;gap:5px;padding:2.5px 0;font-size:10.5px;font-family:var(--mono)}
 
 /* Table */
 .bottom-tabs{display:flex;gap:4px;margin-bottom:14px}
@@ -434,34 +475,12 @@ tbody tr:hover td{background:var(--card2)}
     </div>
   </div>
 
-  <!-- Kalshi market panels -->
-  <div class="mkt-grid" id="mkt-grid">
-    <div class="card card-pad" id="kp-KXBTC15M">
-      <div class="mkt-head">
-        <span class="coin-ico" style="background:#f7931a;width:26px;height:26px;font-size:13px">B</span>
-        <div><div style="font-weight:700;font-size:14px">BTC 15-min</div><div style="font-size:11px;color:var(--muted)">Kalshi order book</div></div>
-        <div class="mkt-yes"><div class="p" id="kp-yes-KXBTC15M">--&cent;</div><div class="l" id="kp-meta-KXBTC15M">YES price</div></div>
-        <div class="ring"><svg width="44" height="44" viewBox="0 0 44 44"><circle class="ring-bg" cx="22" cy="22" r="17"/><circle class="ring-fg" id="ring-fg-KXBTC15M" cx="22" cy="22" r="17" stroke-dasharray="107" stroke-dashoffset="107" stroke="var(--teal)"/></svg><div class="ring-txt" id="ring-txt-KXBTC15M">--</div></div>
-      </div>
-      <div class="mkt-body">
-        <div class="mkt-chart"><canvas id="kalshiCanvas-KXBTC15M"></canvas></div>
-        <div class="mkt-ob"><div id="ob-KXBTC15M"><div class="empty" style="font-size:10px">loading...</div></div><div id="trades-KXBTC15M"></div></div>
-      </div>
-    </div>
-
-    <div class="card card-pad" id="kp-KXETH15M">
-      <div class="mkt-head">
-        <span class="coin-ico" style="background:#627eea;color:#fff;width:26px;height:26px;font-size:13px">E</span>
-        <div><div style="font-weight:700;font-size:14px">ETH 15-min</div><div style="font-size:11px;color:var(--muted)">Kalshi order book</div></div>
-        <div class="mkt-yes"><div class="p" id="kp-yes-KXETH15M">--&cent;</div><div class="l" id="kp-meta-KXETH15M">YES price</div></div>
-        <div class="ring"><svg width="44" height="44" viewBox="0 0 44 44"><circle class="ring-bg" cx="22" cy="22" r="17"/><circle class="ring-fg" id="ring-fg-KXETH15M" cx="22" cy="22" r="17" stroke-dasharray="107" stroke-dashoffset="107" stroke="var(--teal)"/></svg><div class="ring-txt" id="ring-txt-KXETH15M">--</div></div>
-      </div>
-      <div class="mkt-body">
-        <div class="mkt-chart"><canvas id="kalshiCanvas-KXETH15M"></canvas></div>
-        <div class="mkt-ob"><div id="ob-KXETH15M"><div class="empty" style="font-size:10px">loading...</div></div><div id="trades-KXETH15M"></div></div>
-      </div>
-    </div>
+  <!-- Kalshi market panels (built by JS) -->
+  <div class="page-head" style="margin:6px 0 14px">
+    <div class="page-title" style="font-size:17px">Live Kalshi Markets<small>Real-time price, order-book depth &amp; buy-in cost</small></div>
+    <span class="pill" style="margin-left:auto"><span class="live-dot"></span>Live &middot; updates every 3s</span>
   </div>
+  <div class="mkt-grid" id="mkt-grid"></div>
 
   <!-- Bottom table -->
   <div class="bottom-tabs">
@@ -616,32 +635,177 @@ function updateDonut(series,yes){
   document.getElementById('dl-no-'+series).textContent=yes!=null?(100-yes)+'¢':'--';
 }
 
-/* ── Kalshi probability charts ── */
-function makeKalshi(id){
+/* ── Kalshi market panels: build, charts, polling, buy-in ── */
+const MKT={
+  KXBTC15M:{coin:'BTC',ico:'B',bg:'#f7931a',fg:'#0e1424',name:'Bitcoin'},
+  KXETH15M:{coin:'ETH',ico:'E',bg:'#627eea',fg:'#ffffff',name:'Ethereum'},
+};
+const mktView={KXBTC15M:'price',KXETH15M:'price'};   // 'price' | 'depth'
+const buySide={KXBTC15M:'yes',KXETH15M:'yes'};
+const lastMarket={};                                 // latest payload per series
+const priceCharts={},depthCharts={};
+
+function buildMktPanels(){
+  const grid=document.getElementById('mkt-grid');
+  grid.innerHTML=Object.keys(MKT).map(series=>{
+    const c=MKT[series];
+    return `<div class="card card-pad" id="kp-${series}">
+      <div class="mkt-head">
+        <span class="coin-ico" style="background:${c.bg};color:${c.fg};width:28px;height:28px;font-size:14px">${c.ico}</span>
+        <div><div class="mkt-title">${c.coin} 15-min <span class="live-dot"></span></div>
+          <div class="mkt-tk" id="kp-tk-${series}">finding active market...</div></div>
+        <div class="ring"><svg width="44" height="44" viewBox="0 0 44 44"><circle class="ring-bg" cx="22" cy="22" r="17"/><circle class="ring-fg" id="ring-fg-${series}" cx="22" cy="22" r="17" stroke-dasharray="107" stroke-dashoffset="107" stroke="var(--teal)"/></svg><div class="ring-txt" id="ring-txt-${series}">--</div></div>
+      </div>
+
+      <div class="px-strip">
+        <div class="px-cell yes"><span class="px-lbl">YES</span><span class="px-val" id="kp-yes-${series}">--¢</span><span class="px-sub" id="kp-yesba-${series}">bid/ask</span></div>
+        <div class="px-cell no"><span class="px-lbl">NO</span><span class="px-val" id="kp-no-${series}">--¢</span><span class="px-sub" id="kp-noba-${series}">bid/ask</span></div>
+        <div class="px-cell"><span class="px-lbl">LAST</span><span class="px-val2" id="kp-last-${series}">--¢</span><span class="px-sub">traded</span></div>
+        <div class="px-cell"><span class="px-lbl">SPREAD</span><span class="px-val2" id="kp-spread-${series}">--</span><span class="px-sub" id="kp-vol-${series}">vol --</span></div>
+      </div>
+
+      <div class="mkt-tabs">
+        <button class="mkt-tab active" id="vt-price-${series}" onclick="setMktView('${series}','price')">Price line</button>
+        <button class="mkt-tab" id="vt-depth-${series}" onclick="setMktView('${series}','depth')">Depth (bets on the line)</button>
+        <span class="meta" id="kp-meta-${series}" style="margin-left:auto"></span>
+      </div>
+
+      <div class="mkt-body2">
+        <div class="mkt-chart2">
+          <canvas id="priceCanvas-${series}"></canvas>
+          <canvas id="depthCanvas-${series}" style="display:none"></canvas>
+        </div>
+        <div class="mkt-side">
+          <div class="buyin">
+            <div class="buyin-hdr">BUY-IN COST</div>
+            <div class="buyin-side">
+              <button class="bi-btn active" data-s="yes" id="bs-yes-${series}" onclick="setBuySide('${series}','yes')">YES</button>
+              <button class="bi-btn" data-s="no" id="bs-no-${series}" onclick="setBuySide('${series}','no')">NO</button>
+            </div>
+            <div class="buyin-qty"><label>Qty</label><input type="number" id="bi-qty-${series}" value="1" min="1" max="100000" oninput="recalcBuyin('${series}')"></div>
+            <div class="bi-row"><span>Fill price</span><span id="bi-price-${series}">--¢</span></div>
+            <div class="bi-row"><span>Cost</span><span id="bi-cost-${series}">$--</span></div>
+            <div class="bi-row"><span>Max payout</span><span id="bi-payout-${series}">$--</span></div>
+            <div class="bi-row profit"><span>Max profit</span><span id="bi-profit-${series}">$--</span></div>
+          </div>
+          <div class="trades-box" id="trades-${series}"><div class="empty" style="font-size:10px">loading trades...</div></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Instantiate charts now the canvases exist.
+  Object.keys(MKT).forEach(series=>{
+    priceCharts[series]=makePriceChart('priceCanvas-'+series);
+    depthCharts[series]=makeDepthChart('depthCanvas-'+series);
+  });
+}
+
+function setMktView(series,view){
+  mktView[series]=view;
+  document.getElementById('vt-price-'+series).classList.toggle('active',view==='price');
+  document.getElementById('vt-depth-'+series).classList.toggle('active',view==='depth');
+  document.getElementById('priceCanvas-'+series).style.display=view==='price'?'':'none';
+  document.getElementById('depthCanvas-'+series).style.display=view==='depth'?'':'none';
+  if(lastMarket[series]) renderKalshi(series,lastMarket[series]);
+}
+function setBuySide(series,side){
+  buySide[series]=side;
+  document.getElementById('bs-yes-'+series).classList.toggle('active',side==='yes');
+  document.getElementById('bs-no-'+series).classList.toggle('active',side==='no');
+  recalcBuyin(series);
+}
+
+/* Price-over-time line chart */
+function makePriceChart(id){
   return new Chart(document.getElementById(id).getContext('2d'),{
     type:'line',
     data:{labels:[],datasets:[{data:[],borderColor:'#2fe0b0',backgroundColor:'rgba(47,224,176,.1)',
       borderWidth:2,pointRadius:0,fill:true,tension:.3}]},
     options:{responsive:true,maintainAspectRatio:false,animation:{duration:300},
       plugins:{legend:{display:false},tooltip:{backgroundColor:'#1c2742',borderColor:'#2f3b5e',borderWidth:1,
-        cornerRadius:8,callbacks:{label:c=>'YES: '+c.raw+'¢'}}},
+        cornerRadius:8,callbacks:{label:c=>'YES '+c.raw+'¢  (NO '+(100-c.raw)+'¢)'}}},
       scales:{x:{display:false},y:{min:0,max:100,position:'right',
-        grid:{color:c=>c.tick.value===50?'rgba(255,255,255,.14)':'rgba(255,255,255,.04)'},
+        grid:{color:c=>c.tick.value===50?'rgba(255,255,255,.16)':'rgba(255,255,255,.04)'},
         ticks:{color:'#566087',font:{family:'monospace',size:10},stepSize:25,callback:v=>v+'¢'}}}}
   });
 }
-const kalshiCharts={KXBTC15M:makeKalshi('kalshiCanvas-KXBTC15M'),KXETH15M:makeKalshi('kalshiCanvas-KXETH15M')};
+/* Market-depth chart: cumulative bets stacked toward the line */
+function makeDepthChart(id){
+  return new Chart(document.getElementById(id).getContext('2d'),{
+    type:'line',
+    data:{datasets:[
+      {label:'YES bids',data:[],borderColor:'#2fe0b0',backgroundColor:'rgba(47,224,176,.18)',
+        borderWidth:2,pointRadius:0,fill:true,stepped:true},
+      {label:'NO bids',data:[],borderColor:'#fb7185',backgroundColor:'rgba(251,113,133,.18)',
+        borderWidth:2,pointRadius:0,fill:true,stepped:true},
+      {label:'line',data:[],borderColor:'#a78bfa',borderWidth:1.5,borderDash:[5,4],pointRadius:0,fill:false}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:250},parsing:false,
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#1c2742',borderColor:'#2f3b5e',borderWidth:1,cornerRadius:8,
+        callbacks:{title:items=>items.length?('Price '+items[0].parsed.x+'¢'):'',label:c=>c.dataset.label+': '+c.parsed.y+' contracts'}}},
+      scales:{
+        x:{type:'linear',min:0,max:100,grid:{color:'rgba(255,255,255,.04)'},
+          ticks:{color:'#566087',font:{family:'monospace',size:10},stepSize:25,callback:v=>v+'¢'}},
+        y:{position:'right',beginAtZero:true,grid:{color:'rgba(255,255,255,.04)'},
+          ticks:{color:'#566087',font:{family:'monospace',size:10},callback:v=>v>=1000?(v/1000).toFixed(1)+'k':v}}}}
+  });
+}
+
 function pushKalshiPoint(series,yes){
   const h=kalshiHistory[series];
   if(h.length&&h[h.length-1].yes===yes) return;
   h.push({yes,t:Date.now()});
-  if(h.length>120) h.shift();
-  const c=kalshiCharts[series];
+  if(h.length>180) h.shift();
+  const c=priceCharts[series];
   c.data.labels=h.map((_,i)=>i);
   c.data.datasets[0].data=h.map(p=>p.yes);
   c.data.datasets[0].borderColor=yes>=50?'#2fe0b0':'#fb7185';
   c.data.datasets[0].backgroundColor=yes>=50?'rgba(47,224,176,.1)':'rgba(251,113,133,.1)';
   c.update('none');
+}
+
+/* Build the cumulative depth curves from the raw order book */
+function renderDepth(series,ob,mid){
+  const chart=depthCharts[series];
+  const yesL=(ob.yes||[]).map(([p,s])=>[+p,+s]).filter(x=>x[1]>0);
+  const noL =(ob.no ||[]).map(([p,s])=>[+p,+s]).filter(x=>x[1]>0);
+  // YES bids: people paying p¢ for YES. Cumulative from best (high p) down.
+  yesL.sort((a,b)=>b[0]-a[0]);
+  let cum=0; const yesPts=[];
+  for(const [p,s] of yesL){cum+=s;yesPts.push({x:p,y:cum});}
+  yesPts.sort((a,b)=>a.x-b.x);
+  // NO bids at q¢ = willingness to SELL YES at (100-q)¢ (the YES-ask side).
+  const asks=noL.map(([q,s])=>[100-q,s]).sort((a,b)=>a[0]-b[0]);
+  cum=0; const askPts=[];
+  for(const [p,s] of asks){cum+=s;askPts.push({x:p,y:cum});}
+  const maxY=Math.max(1,...yesPts.map(p=>p.y),...askPts.map(p=>p.y));
+  chart.data.datasets[0].data=yesPts;
+  chart.data.datasets[1].data=askPts;
+  chart.data.datasets[2].data=(mid!=null)?[{x:mid,y:0},{x:mid,y:maxY}]:[];
+  chart.options.scales.y.max=maxY*1.1;
+  chart.update('none');
+}
+
+/* Buy-in cost calculator */
+function recalcBuyin(series){
+  const m=lastMarket[series]?lastMarket[series].market:null;
+  const side=buySide[series];
+  const qty=Math.max(1,parseInt(document.getElementById('bi-qty-'+series).value||'1',10));
+  // Cost to BUY immediately = cross the spread (pay the ask). YES ask, or for
+  // NO the cost is (100 - yes_bid)¢. Fall back to last/mid if a side is empty.
+  let price=null;
+  if(m){
+    if(side==='yes') price=(m.yes_ask!=null)?m.yes_ask:(m.last_price!=null?m.last_price:null);
+    else price=(m.yes_bid!=null)?(100-m.yes_bid):(m.last_price!=null?100-m.last_price:null);
+  }
+  const set=(id,v)=>{document.getElementById(id).textContent=v;};
+  if(price==null){set('bi-price-'+series,'--¢');set('bi-cost-'+series,'$--');set('bi-payout-'+series,'$--');set('bi-profit-'+series,'$--');return;}
+  const cost=qty*price/100, payout=qty*1.0, profit=payout-cost;
+  set('bi-price-'+series,price+'¢');
+  set('bi-cost-'+series,'$'+cost.toFixed(2));
+  set('bi-payout-'+series,'$'+payout.toFixed(2));
+  set('bi-profit-'+series,'+$'+profit.toFixed(2));
 }
 
 /* ── Kalshi polling ── */
@@ -653,6 +817,7 @@ async function fetchKalshi(series){
     const d=await r.json();
     if(d.error){if(meta)meta.textContent='Kalshi unreachable';return;}
     if(!d.market){if(meta)meta.textContent='no open market';return;}
+    lastMarket[series]=d;
     renderKalshi(series,d);
   }catch(e){if(meta)meta.textContent='connection error';}
 }
@@ -660,13 +825,23 @@ function renderKalshi(series,data){
   const m=data.market||{},ob=data.orderbook||{},trades=data.trades||[];
   const bid=m.yes_bid,ask=m.yes_ask;
   const yes=(bid!=null&&ask!=null)?Math.round((bid+ask)/2):(m.last_price!=null?m.last_price:null);
-  const yesEl=document.getElementById('kp-yes-'+series),meta=document.getElementById('kp-meta-'+series);
-  if(yes!=null){
-    yesEl.textContent=yes+'¢';yesEl.style.color=yes>=50?'var(--teal)':'var(--red)';
-    const vol=m.volume_24h?(m.volume_24h/1000).toFixed(1)+'k vol':'';
-    meta.textContent='NO '+(100-yes)+'¢  '+vol;
-    pushKalshiPoint(series,yes);updateDonut(series,yes);
-  }else{yesEl.textContent='--¢';meta.textContent='no data';updateDonut(series,null);}
+
+  // Ticker + price strip
+  document.getElementById('kp-tk-'+series).textContent=(m.ticker||'').split('-').slice(-1)[0]||m.ticker||'--';
+  const yEl=document.getElementById('kp-yes-'+series),nEl=document.getElementById('kp-no-'+series);
+  if(yes!=null){yEl.textContent=yes+'¢';nEl.textContent=(100-yes)+'¢';}else{yEl.textContent='--¢';nEl.textContent='--¢';}
+  document.getElementById('kp-yesba-'+series).textContent=(bid!=null?bid:'-')+' / '+(ask!=null?ask:'-');
+  document.getElementById('kp-noba-'+series).textContent=(m.no_bid!=null?m.no_bid:'-')+' / '+(m.no_ask!=null?m.no_ask:'-');
+  document.getElementById('kp-last-'+series).textContent=(m.last_price!=null?m.last_price+'¢':'--');
+  const spread=(bid!=null&&ask!=null)?(ask-bid):null;
+  document.getElementById('kp-spread-'+series).textContent=spread!=null?spread+'¢':'--';
+  document.getElementById('kp-vol-'+series).textContent='vol '+(m.volume_24h?(m.volume_24h>=1000?(m.volume_24h/1000).toFixed(1)+'k':m.volume_24h):'--');
+  const meta=document.getElementById('kp-meta-'+series);
+  meta.textContent=(m.open_interest?('OI '+m.open_interest+'  '):'')+(m.liquidity?('liq $'+(m.liquidity/100).toFixed(0)):'');
+
+  if(yes!=null){pushKalshiPoint(series,yes);updateDonut(series,yes);}else updateDonut(series,null);
+
+  // Expiry ring
   if(m.expiration_time){
     const mins=Math.max(0,(new Date(m.expiration_time).getTime()-Date.now())/60000);
     const frac=Math.min(1,mins/15),off=107*(1-frac);
@@ -674,29 +849,25 @@ function renderKalshi(series,data){
     if(fg){fg.style.strokeDashoffset=off;fg.style.stroke=mins<3?'var(--red)':mins<7?'var(--yellow)':'var(--teal)';}
     if(txt)txt.textContent=mins<1?'<1m':Math.floor(mins)+'m';
   }
-  renderOB(series,ob);renderTrades(series,trades);
-}
-function renderOB(series,ob){
-  const el=document.getElementById('ob-'+series);
-  const yesL=(ob.yes||[]).slice(0,6),noL=(ob.no||[]).slice(0,6);
-  if(!yesL.length&&!noL.length){el.innerHTML='<div class="empty" style="font-size:10px">no book</div>';return;}
-  const maxS=Math.max(...[...yesL,...noL].map(l=>l[1]||0),1);
-  const asks=noL.map(([p,s])=>{const w=Math.round(s/maxS*100);return `<div class="ob-row"><span class="ob-price" style="color:var(--red)">${100-p}</span><div style="flex:1"><div class="ob-bar" style="width:${w}%;background:rgba(251,113,133,.4);max-width:64px"></div></div><span class="ob-size">${s}</span></div>`;}).reverse().join('');
-  const bids=yesL.map(([p,s])=>{const w=Math.round(s/maxS*100);return `<div class="ob-row"><span class="ob-price" style="color:var(--teal)">${p}</span><div style="flex:1"><div class="ob-bar" style="width:${w}%;background:rgba(47,224,176,.4);max-width:64px"></div></div><span class="ob-size">${s}</span></div>`;}).join('');
-  el.innerHTML=`<div class="ob-side-lbl" style="color:var(--red)">ASKS</div>${asks}<div style="height:1px;background:var(--border2);margin:4px 0"></div><div class="ob-side-lbl" style="color:var(--teal)">BIDS</div>${bids}`;
+
+  // Active chart view
+  if(mktView[series]==='depth') renderDepth(series,ob,yes);
+  renderTrades(series,trades);
+  recalcBuyin(series);
 }
 function renderTrades(series,trades){
   const el=document.getElementById('trades-'+series);
-  if(!trades.length){el.innerHTML='';return;}
-  el.innerHTML='<div class="ob-side-lbl" style="color:var(--muted);margin-top:6px">RECENT TRADES</div>'+trades.slice(0,5).map(t=>{
+  if(!trades.length){el.innerHTML='<div class="empty" style="font-size:10px">no recent trades</div>';return;}
+  el.innerHTML='<div class="ob-side-lbl" style="color:var(--muted)">RECENT TRADES</div>'+trades.slice(0,8).map(t=>{
     const side=t.taker_side,col=side==='yes'?'var(--teal)':'var(--red)';
-    return `<div class="trade-row"><span style="color:${col};width:50px">${side==='yes'?'BUY YES':'BUY NO'}</span><span>${t.yes_price!=null?t.yes_price:(t.price!=null?t.price:'?')}¢</span><span style="color:var(--muted);margin-left:auto">x${t.count||1}</span></div>`;
+    const px=t.yes_price!=null?t.yes_price:(t.price!=null?t.price:'?');
+    return `<div class="trade-row"><span style="color:${col};width:52px">${side==='yes'?'BUY YES':'BUY NO'}</span><span>${px}¢</span><span style="color:var(--muted);margin-left:auto">x${t.count||1}</span></div>`;
   }).join('');
 }
 function startKalshiPolling(){
   if(kalshiTimer) return;
   const poll=()=>{fetchKalshi('KXBTC15M');fetchKalshi('KXETH15M');};
-  poll();kalshiTimer=setInterval(poll,5000);
+  poll();kalshiTimer=setInterval(poll,3000);
 }
 
 /* ── WebSocket ── */
@@ -906,6 +1077,7 @@ function fmtNum(v){if(v==null)return'0.00';return Number(v).toLocaleString('en-U
 function fmtPct(v,signed){if(v==null)return'--';return(signed&&v>0?'+':'')+Number(v).toFixed(2)+'%';}
 
 /* ── Boot ── */
+buildMktPanels();
 connect();
 startKalshiPolling();
 </script>

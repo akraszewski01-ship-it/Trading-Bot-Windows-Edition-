@@ -173,9 +173,10 @@ async def kalshi_market(series: str):
                 market = markets[0]
             ticker = market["ticker"]
 
-            # Fetch orderbook and recent trades in parallel
-            ob_task = client.get(f"{KALSHI_API}/markets/{ticker}/orderbook", params={"depth": 8})
-            tr_task = client.get(f"{KALSHI_API}/markets/{ticker}/trades", params={"limit": 25})
+            # Fetch orderbook and recent trades in parallel. Deeper book (100
+            # levels) so the dashboard can draw a full market-depth chart.
+            ob_task = client.get(f"{KALSHI_API}/markets/{ticker}/orderbook", params={"depth": 100})
+            tr_task = client.get(f"{KALSHI_API}/markets/{ticker}/trades", params={"limit": 30})
             ob_r, tr_r = await asyncio.gather(ob_task, tr_task, return_exceptions=True)
 
             orderbook = ob_r.json() if not isinstance(ob_r, Exception) and ob_r.status_code == 200 else {}
